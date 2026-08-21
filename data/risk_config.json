@@ -1,0 +1,46 @@
+{
+  "str": {
+    "large_transaction": 300000,
+    "structuring_threshold": 100000,
+    "structuring_count": 100,
+    "structuring_total": 6000000,
+    "round_amount_min": 5000,
+    "high_freq_count": 60,
+    "high_freq_hours": 1
+  },
+  "ttr": {
+    "threshold": 300000
+  },
+  "kyc": {
+    "high_risk_types": [
+      "money exchange",
+      "casino",
+      "crypto",
+      "pawnshop",
+      "night club",
+      "arms dealer"
+    ],
+    "new_merchant_days": 30
+  },
+  "columns": {
+    "str": {
+      "transaction_date": "Transaction Date",
+      "amount": "Amount",
+      "counterparty": "Counterparty",
+      "merchant_name": "Merchant Name",
+      "phone": "Phone",
+      "customer_party": "Customer Party",
+      "status": "Status"
+    },
+    "ttr": {
+      "transaction_date": "Transaction Date",
+      "amount": "Amount",
+      "counterparty": "Counterparty",
+      "merchant_name": "Merchant Name",
+      "phone": "Phone",
+      "customer_party": "Customer Party",
+      "status": "Status"
+    },
+    "available": {}
+  }
+}

@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Upload Data - Risk Management{% endblock %}
+{% block page_title %}Upload Data{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row g-4">
+        <!-- Upload Form -->
+        <div class="col-lg-8">
+            <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-file-earmark-excel"></i> Upload Excel Files</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">Upload your data files (.xlsx, .xls, or .csv) for risk analysis. <strong>MMQR format auto-detected!</strong> Each file should contain specific columns as per the templates below.</p>
+
+                        <!-- Transactions -->
+                        <div class="upload-section mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-arrow-left-right text-primary"></i> Transactions Data
+                            </label>
+                            <div class="upload-area" id="txnUploadArea">
+                                <input type="file" name="transactions_file" id="txnFile" accept=".xlsx,.xls,.csv" class="d-none" onchange="handleFileSelect(this, 'txn')">
+                                <div class="upload-placeholder" onclick="document.getElementById('txnFile').click()">
+                                    <i class="bi bi-cloud-arrow-up fs-1 text-primary"></i>
+                                    <p class="mb-1">Click to upload or drag & drop (.xlsx / .csv)</p>
+                                    <small class="text-muted">Required columns: transaction_id, account_id, amount, transaction_date, transaction_type</small>
+                                </div>
+                                <div class="upload-selected d-none" id="txnSelected">
+                                    <i class="bi bi-file-earmark-excel text-success fs-3"></i>
+                                    <div>
+                                        <p class="mb-0 fw-bold" id="txnFileName">-</p>
+                                        <small class="text-muted" id="txnFileSize">-</small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile('txn')">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <a href="{{ url_for('download_template', template_type='transactions') }}" class="btn btn-sm btn-link px-0">
+                                <i class="bi bi-download"></i> Download template
+                            </a>
+                        </div>
+
+                        <!-- Merchants -->
+                        <div class="upload-section mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-shop text-info"></i> Merchants Data
+                            </label>
+                            <div class="upload-area" id="merchantUploadArea">
+                                <input type="file" name="merchants_file" id="merchantFile" accept=".xlsx,.xls,.csv" class="d-none" onchange="handleFileSelect(this, 'merchant')">
+                                <div class="upload-placeholder" onclick="document.getElementById('merchantFile').click()">
+                                    <i class="bi bi-cloud-arrow-up fs-1 text-info"></i>
+                                    <p class="mb-1">Click to upload or drag & drop (.xlsx / .csv)</p>
+                                    <small class="text-muted">Required columns: merchant_id, merchant_name, business_type, registration_date, owner_name, license_number, license_expiry</small>
+                                </div>
+                                <div class="upload-selected d-none" id="merchantSelected">
+                                    <i class="bi bi-file-earmark-excel text-success fs-3"></i>
+                                    <div>
+                                        <p class="mb-0 fw-bold" id="merchantFileName">-</p>
+                                        <small class="text-muted" id="merchantFileSize">-</small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile('merchant')">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <a href="{{ url_for('download_template', template_type='merchants') }}" class="btn btn-sm btn-link px-0">
+                                <i class="bi bi-download"></i> Download template
+                            </a>
+                        </div>
+
+                        <!-- Blacklist -->
+                        <div class="upload-section mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="bi bi-person-x text-danger"></i> Blacklist Data
+                            </label>
+                            <div class="upload-area" id="blUploadArea">
+                                <input type="file" name="blacklist_file" id="blFile" accept=".xlsx,.xls,.csv" class="d-none" onchange="handleFileSelect(this, 'bl')">
+                                <div class="upload-placeholder" onclick="document.getElementById('blFile').click()">
+                                    <i class="bi bi-cloud-arrow-up fs-1 text-danger"></i>
+                                    <p class="mb-1">Click to upload or drag & drop (.xlsx / .csv)</p>
+                                    <small class="text-muted">Columns: account_id, merchant_id, name, phone, nrc, reason, date_added</small>
+                                </div>
+                                <div class="upload-selected d-none" id="blSelected">
+                                    <i class="bi bi-file-earmark-excel text-success fs-3"></i>
+                                    <div>
+                                        <p class="mb-0 fw-bold" id="blFileName">-</p>
+                                        <small class="text-muted" id="blFileSize">-</small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile('bl')">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <a href="{{ url_for('download_template', template_type='blacklist') }}" class="btn btn-sm btn-link px-0">
+                                <i class="bi bi-download"></i> Download template
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-upload"></i> Upload & Analyze
+                            </button>
+                            <a href="{{ url_for('download_template', template_type='mmqr') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-download"></i> Download MMQR Template
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Info Panel -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> File Requirements</h6>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-primary">Transactions</h6>
+                    <ul class="small mb-3">
+                        <li><code>transaction_id</code> - Unique ID</li>
+                        <li><code>account_id</code> - Account identifier</li>
+                        <li><code>amount</code> - Transaction amount</li>
+                        <li><code>transaction_date</code> - Date (YYYY-MM-DD)</li>
+                        <li><code>transaction_type</code> - Transfer/Withdrawal/Deposit</li>
+                    </ul>
+
+                    <h6 class="text-info">Merchants</h6>
+                    <ul class="small mb-3">
+                        <li><code>merchant_id</code> - Unique ID</li>
+                        <li><code>merchant_name</code> - Business name</li>
+                        <li><code>business_type</code> - Type of business</li>
+                        <li><code>owner_name</code> - Owner's name</li>
+                        <li><code>license_number</code> - License ID</li>
+                        <li><code>license_expiry</code> - Expiry date</li>
+                    </ul>
+
+                    <h6 class="text-danger">Blacklist</h6>
+                    <ul class="small mb-0">
+                        <li><code>account_id</code> - Flagged account</li>
+                        <li><code>merchant_id</code> - Flagged merchant</li>
+                        <li><code>name</code> - Flagged person</li>
+                        <li><code>phone</code> / <code>nrc</code> - Identifiers</li>
+                        <li><code>reason</code> - Blacklist reason</li>
+                    </ul>
+                </div>
+            </div>
+
+            {% if file_names %}
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-folder"></i> Currently Loaded</h6>
+                </div>
+                <div class="card-body">
+                    {% if file_names.get('transactions') %}
+                    <p class="mb-1"><i class="bi bi-check-circle text-success"></i> <strong>Transactions:</strong> {{ file_names.transactions }}</p>
+                    {% endif %}
+                    {% if file_names.get('merchants') %}
+                    <p class="mb-1"><i class="bi bi-check-circle text-success"></i> <strong>Merchants:</strong> {{ file_names.merchants }}</p>
+                    {% endif %}
+                    {% if file_names.get('blacklist') %}
+                    <p class="mb-0"><i class="bi bi-check-circle text-success"></i> <strong>Blacklist:</strong> {{ file_names.blacklist }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function handleFileSelect(input, prefix) {
+    if (input.files.length > 0) {
+        const file = input.files[0];
+        document.getElementById(prefix + 'Selected').classList.remove('d-none');
+        document.getElementById(prefix + 'UploadArea').querySelector('.upload-placeholder').classList.add('d-none');
+        document.getElementById(prefix + 'FileName').textContent = file.name;
+        document.getElementById(prefix + 'FileSize').textContent = formatFileSize(file.size);
+    }
+}
+
+function clearFile(prefix) {
+    document.getElementById(prefix + 'File').value = '';
+    document.getElementById(prefix + 'Selected').classList.add('d-none');
+    document.getElementById(prefix + 'UploadArea').querySelector('.upload-placeholder').classList.remove('d-none');
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}TTR Report - Risk Management{% endblock %}
+{% block page_title %}TTR - Threshold Transaction Report{% endblock %}
+
+{% block page_actions %}
+<form class="d-flex align-items-center gap-2" method="GET">
+    <label class="form-label mb-0 small text-nowrap">Threshold (MMK):</label>
+    <input type="number" name="threshold" value="{{ threshold }}" class="form-control form-control-sm" style="width:150px" step="1000" min="0">
+    <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+</form>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% if summary %}
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card border-danger">
+                <div class="card-body text-center">
+                    <h2 class="text-danger mb-0">{{ summary.total }}</h2>
+                    <small class="text-muted">Flagged Transactions</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-warning">
+                <div class="card-body text-center">
+                    <h2 class="text-warning mb-0">{{ "{:,.0f}".format(summary.total_amount) }}</h2>
+                    <small class="text-muted">Total Amount (MMK)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-info">
+                <div class="card-body text-center">
+                    <h2 class="text-info mb-0">{{ "{:,.0f}".format(summary.avg_amount) }}</h2>
+                    <small class="text-muted">Average Amount</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-secondary">
+                <div class="card-body text-center">
+                    <h2 class="mb-0">{{ "{:,.0f}".format(threshold) }}</h2>
+                    <small class="text-muted">Threshold (MMK)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" id="ttrSearch" placeholder="Search..." onkeyup="filterTTR()">
+                </div>
+                <div class="col-auto">
+                    <select class="form-select form-select-sm" id="ttrTypeFilter" onchange="filterTTR()">
+                        <option value="">All Types</option>
+                        {% if summary and summary.by_type %}
+                            {% for t in summary.by_type.keys() %}
+                            <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="col-auto ms-auto">
+                    <button class="btn btn-sm btn-outline-success" onclick="exportTableCSV('ttrTable', 'ttr_report')">
+                        <i class="bi bi-download"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card">
+        <div class="card-body table-responsive">
+            {% if results %}
+            <table class="table table-hover table-sm" id="ttrTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        {% for col, label in visible_cols.items() %}
+                        <th{% if col == 'amount' %} class="text-end"{% endif %}>{{ label }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in results %}
+                    <tr data-type="{{ row.get('transaction_type', '') }}">
+                        <td>{{ loop.index }}</td>
+                        {% for col, label in visible_cols.items() %}
+                        <td{% if col == 'amount' %} class="text-end fw-bold text-danger"{% endif %}>
+                            {% if col == 'amount' %}
+                                {{ "{:,.0f}".format(row.get(col, 0)) }}
+                            {% elif col == 'transaction_date' %}
+                                {{ row.get(col, '-')[:19] if row.get(col) else '-' }}
+                            {% elif col == 'status' %}
+                                <span class="badge bg-warning text-dark">{{ row.get(col, 'Pending') }}</span>
+                            {% else %}
+                                {{ row.get(col, '-') }}
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-cash-stack fs-1 text-success"></i>
+                <h5 class="mt-3">No Transactions Above Threshold</h5>
+                <p class="text-muted">All transactions are below {{ "{:,.0f}".format(threshold) }} MMK</p>
+                <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload Data</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterTTR() {
+    const search = document.getElementById('ttrSearch').value.toLowerCase();
+    const typeF = document.getElementById('ttrTypeFilter').value;
+    document.querySelectorAll('#ttrTable tbody tr').forEach(row => {
+        const matchType = !typeF || row.dataset.type === typeF;
+        const matchSearch = !search || row.textContent.toLowerCase().includes(search);
+        row.style.display = (matchType && matchSearch) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

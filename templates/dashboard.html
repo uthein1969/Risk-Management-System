@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Risk Management{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Stats Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card border-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">Total Transactions</h6>
+                            <h3 class="mb-0">{{ stats.total_transactions | default(0) }}</h3>
+                        </div>
+                        <div class="stat-icon bg-primary-subtle">
+                            <i class="bi bi-arrow-left-right text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">STR Alerts</h6>
+                            <h3 class="mb-0 text-warning">{{ stats.str_count | default(0) }}</h3>
+                        </div>
+                        <div class="stat-icon bg-warning-subtle">
+                            <i class="bi bi-exclamation-triangle text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-danger">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">TTR Flagged</h6>
+                            <h3 class="mb-0 text-danger">{{ stats.ttr_count | default(0) }}</h3>
+                        </div>
+                        <div class="stat-icon bg-danger-subtle">
+                            <i class="bi bi-cash-stack text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">Merchants</h6>
+                            <h3 class="mb-0">{{ stats.total_merchants | default(0) }}</h3>
+                        </div>
+                        <div class="stat-icon bg-info-subtle">
+                            <i class="bi bi-shop text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card border-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">KYC Issues</h6>
+                            <h3 class="mb-0 text-warning">{{ stats.kyc_issues | default(0) }}</h3>
+                        </div>
+                        <div class="stat-icon bg-warning-subtle">
+                            <i class="bi bi-person-exclamation text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card border-danger">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">Blacklist Hits</h6>
+                            <h3 class="mb-0 text-danger">{{ stats.blacklist_hits | default(0) }}</h3>
+                        </div>
+                        <div class="stat-icon bg-danger-subtle">
+                            <i class="bi bi-person-x text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card border-secondary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">Blacklist Entries</h6>
+                            <h3 class="mb-0">{{ stats.total_blacklist | default(0) }}</h3>
+                        </div>
+                        <div class="stat-icon bg-secondary-subtle">
+                            <i class="bi bi-database text-secondary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-lightning-charge"></i> Quick Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('upload') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-cloud-upload"></i> Upload New Data
+                        </a>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <a href="{{ url_for('str_report') }}" class="btn btn-outline-warning w-100">
+                                    <i class="bi bi-exclamation-triangle"></i> Run STR Analysis
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="{{ url_for('ttr_report') }}" class="btn btn-outline-danger w-100">
+                                    <i class="bi bi-cash-stack"></i> Run TTR Check
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="{{ url_for('kyc_inspection') }}" class="btn btn-outline-info w-100">
+                                    <i class="bi bi-person-check"></i> KYC Inspection
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="{{ url_for('blacklist_check') }}" class="btn btn-outline-secondary w-100">
+                                    <i class="bi bi-person-x"></i> Blacklist Check
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="{{ url_for('settings') }}" class="btn btn-outline-light w-100">
+                                    <i class="bi bi-gear"></i> Settings
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> System Status</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tr>
+                            <td class="text-muted">Last Upload</td>
+                            <td class="text-end">{{ stats.last_upload | default('Never') }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Transactions File</td>
+                            <td class="text-end">
+                                {% if stats.total_transactions > 0 %}
+                                    <span class="badge bg-success">Loaded</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Not loaded</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Merchants File</td>
+                            <td class="text-end">
+                                {% if stats.total_merchants > 0 %}
+                                    <span class="badge bg-success">Loaded</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Not loaded</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Blacklist File</td>
+                            <td class="text-end">
+                                {% if stats.total_blacklist > 0 %}
+                                    <span class="badge bg-success">Loaded</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Not loaded</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

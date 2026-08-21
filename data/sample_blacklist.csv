@@ -1,0 +1,5 @@
+account_id,merchant_id,name,phone,nrc,reason,date_added
+ACC005,,U Bad Guy,09999999999,12/MAHA(N)999999,Fraud,2026-01-15
+,MERCH008,Suspicious Shop,09888888888,,Money Laundering,2026-03-20
+ACC012,,U Dark Money,09777777777,5/BAHA(N)555555,Terrorism Financing,2025-11-01
+,,U Scam Master,09666666666,7/YAHA(N)777777,Online Scam,2026-05-10

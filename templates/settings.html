@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}Settings - Risk Management{% endblock %}
+{% block page_title %}⚙️ Rule Configuration{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <form method="POST">
+        <div class="row g-4">
+            <!-- STR Configuration -->
+            <div class="col-lg-6">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning-subtle">
+                        <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> STR Rules (Suspicious Transaction Report)</h6>
+                    </div>
+                    <div class="card-body">
+                        <!-- Large Transaction -->
+                        <div class="mb-4">
+                            <h6 class="text-warning">Rule 1: Large Transaction</h6>
+                            <p class="text-muted small mb-2">Single transaction ≥ this amount → MEDIUM severity</p>
+                            <div class="input-group">
+                                <span class="input-group-text">Amount ≥</span>
+                                <input type="number" name="str_large_transaction" value="{{ config.str.large_transaction }}" class="form-control" step="1000" min="0">
+                                <span class="input-group-text">MMK</span>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Structuring -->
+                        <div class="mb-4">
+                            <h6 class="text-warning">Rule 2: Structuring</h6>
+                            <p class="text-muted small mb-2">Multiple small transactions to avoid threshold → HIGH severity</p>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small">Small txn under</label>
+                                    <div class="input-group">
+                                        <input type="number" name="str_structuring_threshold" value="{{ config.str.structuring_threshold }}" class="form-control" step="1000" min="0">
+                                        <span class="input-group-text">MMK</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Count ≥ (in 24h)</label>
+                                    <input type="number" name="str_structuring_count" value="{{ config.str.structuring_count }}" class="form-control" min="2">
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label small">Total exceeds</label>
+                                    <div class="input-group">
+                                        <input type="number" name="str_structuring_total" value="{{ config.str.structuring_total }}" class="form-control" step="1000" min="0">
+                                        <span class="input-group-text">MMK</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Round Amount -->
+                        <div class="mb-4">
+                            <h6 class="text-warning">Rule 3: Round Amount</h6>
+                            <p class="text-muted small mb-2">Round number transactions → LOW severity</p>
+                            <div class="input-group">
+                                <span class="input-group-text">Amount ≥</span>
+                                <input type="number" name="str_round_amount_min" value="{{ config.str.round_amount_min }}" class="form-control" step="1000" min="0">
+                                <span class="input-group-text">MMK (multiples of 1,000)</span>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- High Frequency -->
+                        <div class="mb-3">
+                            <h6 class="text-warning">Rule 4: High Frequency</h6>
+                            <p class="text-muted small mb-2">Too many transactions in short time → HIGH severity</p>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small">Count > </label>
+                                    <input type="number" name="str_high_freq_count" value="{{ config.str.high_freq_count }}" class="form-control" min="1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Within (hours)</label>
+                                    <input type="number" name="str_high_freq_hours" value="{{ config.str.high_freq_hours }}" class="form-control" min="1" max="24">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TTR Configuration -->
+            <div class="col-lg-6">
+                <div class="card border-danger mb-4">
+                    <div class="card-header bg-danger-subtle">
+                        <h6 class="mb-0"><i class="bi bi-cash-stack"></i> TTR Rules (Threshold Transaction Report)</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6 class="text-danger">Threshold Amount</h6>
+                            <p class="text-muted small mb-2">Flag all transactions ≥ this amount</p>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text">Amount ≥</span>
+                                <input type="number" name="ttr_threshold" value="{{ config.ttr.threshold }}" class="form-control form-control-lg" step="1000" min="0">
+                                <span class="input-group-text">MMK</span>
+                            </div>
+                        </div>
+                        <div class="alert alert-info small mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            TTR will flag all transactions at or above this threshold for review.
+                            Common thresholds: <strong>10,000</strong> (standard), <strong>100,000</strong> (high value), <strong>1,000,000</strong> (premium)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KYC Configuration -->
+                <div class="card border-info">
+                    <div class="card-header bg-info-subtle">
+                        <h6 class="mb-0"><i class="bi bi-person-check"></i> KYC Rules</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6 class="text-info">High-Risk Business Types</h6>
+                            <p class="text-muted small mb-2">Comma-separated list of high-risk business types</p>
+                            <textarea name="kyc_high_risk_types" class="form-control" rows="2">{{ config.kyc.high_risk_types | join(', ') }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="text-info">New Merchant Threshold</h6>
+                            <p class="text-muted small mb-2">Merchant registered less than this many days → MEDIUM risk</p>
+                            <div class="input-group">
+                                <span class="input-group-text">Days &lt;</span>
+                                <input type="number" name="kyc_new_merchant_days" value="{{ config.kyc.new_merchant_days }}" class="form-control" min="1">
+                                <span class="input-group-text">= MEDIUM risk</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column Configuration -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-header bg-success-subtle">
+                        <h6 class="mb-0"><i class="bi bi-table"></i> Column Visibility - Choose which columns to show in reports</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- STR Columns -->
+                            <div class="col-md-6">
+                                <h6 class="text-warning"><i class="bi bi-exclamation-triangle"></i> STR Report Columns</h6>
+                                <p class="text-muted small mb-2">Check columns to display in STR report table</p>
+                                <div class="border rounded p-3" style="max-height:300px;overflow-y:auto">
+                                    {% if available_cols %}
+                                        {% for col, label in available_cols.items() %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="str_columns" value="{{ col }}"
+                                                id="str_col_{{ col }}"
+                                                {% if col in config.columns.get('str', {}) %}checked{% endif %}>
+                                            <label class="form-check-label small" for="str_col_{{ col }}">
+                                                {{ label }} <code class="small">({{ col }})</code>
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="text-muted small mb-0">Upload data first to see available columns</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <!-- TTR Columns -->
+                            <div class="col-md-6">
+                                <h6 class="text-danger"><i class="bi bi-cash-stack"></i> TTR Report Columns</h6>
+                                <p class="text-muted small mb-2">Check columns to display in TTR report table</p>
+                                <div class="border rounded p-3" style="max-height:300px;overflow-y:auto">
+                                    {% if available_cols %}
+                                        {% for col, label in available_cols.items() %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="ttr_columns" value="{{ col }}"
+                                                id="ttr_col_{{ col }}"
+                                                {% if col in config.columns.get('ttr', {}) %}checked{% endif %}>
+                                            <label class="form-check-label small" for="ttr_col_{{ col }}">
+                                                {{ label }} <code class="small">({{ col }})</code>
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="text-muted small mb-0">Upload data first to see available columns</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-info small mt-3 mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Tip:</strong> First upload your data file, then come back here to choose which columns to show.
+                            The analysis columns (Rule, Severity, Details) are always shown automatically.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Button -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted">Changes take effect immediately on next analysis.</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('settings') }}" class="btn btn-outline-secondary">Reset</a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-save"></i> Save Configuration
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Current Config Summary -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-list-check"></i> Current Configuration Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6 class="text-warning">STR Rules</h6>
+                            <table class="table table-sm">
+                                <tr><td class="text-muted">Large Transaction</td><td class="text-end">≥ {{ "{:,}".format(config.str.large_transaction) }} MMK</td></tr>
+                                <tr><td class="text-muted">Structuring threshold</td><td class="text-end">< {{ "{:,}".format(config.str.structuring_threshold) }} MMK</td></tr>
+                                <tr><td class="text-muted">Structuring count</td><td class="text-end">≥ {{ config.str.structuring_count }} txns</td></tr>
+                                <tr><td class="text-muted">Structuring total</td><td class="text-end">> {{ "{:,}".format(config.str.structuring_total) }} MMK</td></tr>
+                                <tr><td class="text-muted">Round amount</td><td class="text-end">≥ {{ "{:,}".format(config.str.round_amount_min) }} MMK</td></tr>
+                                <tr><td class="text-muted">High frequency</td><td class="text-end">> {{ config.str.high_freq_count }} txns / {{ config.str.high_freq_hours }}h</td></tr>
+                            </table>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-danger">TTR Rules</h6>
+                            <table class="table table-sm">
+                                <tr><td class="text-muted">Threshold</td><td class="text-end">≥ {{ "{:,}".format(config.ttr.threshold) }} MMK</td></tr>
+                            </table>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-info">KYC Rules</h6>
+                            <table class="table table-sm">
+                                <tr><td class="text-muted">New merchant</td><td class="text-end">&lt; {{ config.kyc.new_merchant_days }} days</td></tr>
+                                <tr><td class="text-muted">High-risk types</td><td class="text-end small">{{ config.kyc.high_risk_types | join(', ') }}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

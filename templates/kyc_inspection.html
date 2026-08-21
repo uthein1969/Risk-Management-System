@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}KYC Inspection - Risk Management{% endblock %}
+{% block page_title %}Merchant KYC Inspection{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% if summary %}
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card border-danger">
+                <div class="card-body text-center">
+                    <h2 class="text-danger mb-0">{{ summary.high }}</h2>
+                    <small class="text-muted">HIGH Risk</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card border-warning">
+                <div class="card-body text-center">
+                    <h2 class="text-warning mb-0">{{ summary.medium }}</h2>
+                    <small class="text-muted">MEDIUM Risk</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card border-success">
+                <div class="card-body text-center">
+                    <h2 class="text-success mb-0">{{ summary.low }}</h2>
+                    <small class="text-muted">LOW Risk</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <select class="form-select form-select-sm" id="kycRiskFilter" onchange="filterKYC()">
+                        <option value="">All Risk Levels</option>
+                        <option value="HIGH">HIGH</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="LOW">LOW</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" id="kycSearch" placeholder="Search merchant..." onkeyup="filterKYC()">
+                </div>
+                <div class="col-auto ms-auto">
+                    <button class="btn btn-sm btn-outline-success" onclick="exportTableCSV('kycTable', 'kyc_inspection')">
+                        <i class="bi bi-download"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card">
+        <div class="card-body table-responsive">
+            {% if results %}
+            <table class="table table-hover table-sm" id="kycTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Risk</th>
+                        <th>Merchant ID</th>
+                        <th>Merchant Name</th>
+                        <th>Business Type</th>
+                        <th>Issues</th>
+                        <th>Issue Count</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in results %}
+                    <tr data-risk="{{ row.risk_level }}">
+                        <td>{{ loop.index }}</td>
+                        <td>
+                            {% if row.risk_level == 'HIGH' %}
+                                <span class="badge bg-danger">HIGH</span>
+                            {% elif row.risk_level == 'MEDIUM' %}
+                                <span class="badge bg-warning text-dark">MEDIUM</span>
+                            {% else %}
+                                <span class="badge bg-success">LOW</span>
+                            {% endif %}
+                        </td>
+                        <td><code>{{ row.merchant_id }}</code></td>
+                        <td>{{ row.merchant_name }}</td>
+                        <td>{{ row.business_type }}</td>
+                        <td class="small">{{ row.issues }}</td>
+                        <td class="text-center">{{ row.issue_count }}</td>
+                        <td><span class="badge bg-warning text-dark">{{ row.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-person-check fs-1 text-success"></i>
+                <h5 class="mt-3">No KYC Issues Found</h5>
+                <p class="text-muted">All merchants pass KYC checks</p>
+                <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload Data</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterKYC() {
+    const risk = document.getElementById('kycRiskFilter').value;
+    const search = document.getElementById('kycSearch').value.toLowerCase();
+    document.querySelectorAll('#kycTable tbody tr').forEach(row => {
+        const matchRisk = !risk || row.dataset.risk === risk;
+        const matchSearch = !search || row.textContent.toLowerCase().includes(search);
+        row.style.display = (matchRisk && matchSearch) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}STR Report - Risk Management{% endblock %}
+{% block page_title %}STR - Suspicious Transaction Report{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% if summary %}
+    <!-- Summary Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card border-danger">
+                <div class="card-body text-center">
+                    <h2 class="text-danger mb-0">{{ summary.total }}</h2>
+                    <small class="text-muted">Total Suspicious</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-danger">
+                <div class="card-body text-center">
+                    <h2 class="text-danger mb-0">{{ summary.high }}</h2>
+                    <small class="text-muted">HIGH Severity</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-warning">
+                <div class="card-body text-center">
+                    <h2 class="text-warning mb-0">{{ summary.medium }}</h2>
+                    <small class="text-muted">MEDIUM Severity</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-info">
+                <div class="card-body text-center">
+                    <h2 class="text-info mb-0">{{ summary.low }}</h2>
+                    <small class="text-muted">LOW Severity</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rule Breakdown -->
+    {% if summary.by_rule %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Detection Rules Breakdown</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for rule, count in summary.by_rule.items() %}
+                <div class="col-md-3 mb-2">
+                    <div class="d-flex justify-content-between align-items-center p-2 bg-body-secondary rounded">
+                        <span>{{ rule }}</span>
+                        <span class="badge bg-danger">{{ count }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <label class="form-label mb-0">Filter by severity:</label>
+                </div>
+                <div class="col-auto">
+                    <select class="form-select form-select-sm" id="severityFilter" onchange="filterTable()">
+                        <option value="">All</option>
+                        <option value="HIGH">HIGH</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="LOW">LOW</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label mb-0">Rule:</label>
+                </div>
+                <div class="col-auto">
+                    <select class="form-select form-select-sm" id="ruleFilter" onchange="filterTable()">
+                        <option value="">All Rules</option>
+                        {% if summary and summary.by_rule %}
+                            {% for rule in summary.by_rule.keys() %}
+                            <option value="{{ rule }}">{{ rule }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" id="searchInput" placeholder="Search..." onkeyup="filterTable()">
+                </div>
+                <div class="col-auto ms-auto">
+                    <button class="btn btn-sm btn-outline-success" onclick="exportTableCSV('strTable', 'str_report')">
+                        <i class="bi bi-download"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Table -->
+    <div class="card">
+        <div class="card-body table-responsive">
+            {% if results %}
+            <table class="table table-hover table-sm" id="strTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Severity</th>
+                        <th>Rule</th>
+                        {% for col, label in visible_cols.items() %}
+                        <th>{{ label }}</th>
+                        {% endfor %}
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in results %}
+                    <tr data-severity="{{ row.severity }}" data-rule="{{ row.rule }}">
+                        <td>{{ loop.index }}</td>
+                        <td>
+                            {% if row.severity == 'HIGH' %}
+                                <span class="badge bg-danger">HIGH</span>
+                            {% elif row.severity == 'MEDIUM' %}
+                                <span class="badge bg-warning text-dark">MEDIUM</span>
+                            {% else %}
+                                <span class="badge bg-info">LOW</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ row.rule }}</td>
+                        {% for col, label in visible_cols.items() %}
+                        <td{% if col == 'amount' %} class="text-end"{% endif %}>
+                            {% if col == 'amount' %}
+                                {{ "{:,.0f}".format(row.get(col, 0)) }}
+                            {% elif col == 'transaction_date' or col == 'date' %}
+                                {{ (row.get(col, '') or row.get('date', ''))[:19] }}
+                            {% else %}
+                                {{ row.get(col, '-') }}
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                        <td class="small">{{ row.details }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-shield-check fs-1 text-success"></i>
+                <h5 class="mt-3">No Suspicious Transactions Detected</h5>
+                <p class="text-muted">Upload transaction data to run STR analysis</p>
+                <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload Data</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterTable() {
+    const severity = document.getElementById('severityFilter').value;
+    const rule = document.getElementById('ruleFilter').value;
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#strTable tbody tr');
+
+    rows.forEach(row => {
+        const matchSeverity = !severity || row.dataset.severity === severity;
+        const matchRule = !rule || row.dataset.rule === rule;
+        const matchSearch = !search || row.textContent.toLowerCase().includes(search);
+        row.style.display = (matchSeverity && matchRule && matchSearch) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}
