@@ -2,158 +2,442 @@
 {% block title %}STR Report - Risk Management{% endblock %}
 {% block page_title %}STR - Suspicious Transaction Report{% endblock %}
 
+{% block page_actions %}
+<a href="{{ url_for('settings') }}#columns" class="btn btn-sm btn-outline-warning">
+    <i class="bi bi-sliders"></i> Choose Columns
+</a>
+<button class="btn btn-sm btn-outline-success" onclick="exportTableCSV('strTable', 'str_full_report')">
+    <i class="bi bi-download"></i> Export CSV
+</button>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
-    {% if summary %}
-    <!-- Summary Cards -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="card stat-card border-danger">
-                <div class="card-body text-center">
-                    <h2 class="text-danger mb-0">{{ summary.total }}</h2>
-                    <small class="text-muted">Total Suspicious</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card stat-card border-danger">
-                <div class="card-body text-center">
-                    <h2 class="text-danger mb-0">{{ summary.high }}</h2>
-                    <small class="text-muted">HIGH Severity</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card stat-card border-warning">
-                <div class="card-body text-center">
-                    <h2 class="text-warning mb-0">{{ summary.medium }}</h2>
-                    <small class="text-muted">MEDIUM Severity</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card stat-card border-info">
-                <div class="card-body text-center">
-                    <h2 class="text-info mb-0">{{ summary.low }}</h2>
-                    <small class="text-muted">LOW Severity</small>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Top-Level Navigation Tabs -->
+    <ul class="nav nav-pills nav-pills-str gap-2 mb-4" id="strTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active d-flex align-items-center gap-2" id="hourly-groups-tab" data-bs-toggle="pill" data-bs-target="#hourly-groups" type="button" role="tab">
+                <i class="bi bi-clock-history fs-5"></i>
+                <span>1-Hour Counterparty Frequency (By Merchant)</span>
+                <span class="badge bg-dark text-warning border border-warning ms-1 px-2">{{ hourly_data.summary.total_groups }} Groups</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link d-flex align-items-center gap-2" id="all-records-tab" data-bs-toggle="pill" data-bs-target="#all-records" type="button" role="tab">
+                <i class="bi bi-table fs-5"></i>
+                <span>All Flagged STR Records</span>
+                <span class="badge bg-secondary ms-1 px-2">{{ summary.total or 0 }}</span>
+            </button>
+        </li>
+    </ul>
 
-    <!-- Rule Breakdown -->
-    {% if summary.by_rule %}
-    <div class="card mb-4">
-        <div class="card-header">
-            <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Detection Rules Breakdown</h6>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                {% for rule, count in summary.by_rule.items() %}
-                <div class="col-md-3 mb-2">
-                    <div class="d-flex justify-content-between align-items-center p-2 bg-body-secondary rounded">
-                        <span>{{ rule }}</span>
-                        <span class="badge bg-danger">{{ count }}</span>
+    <div class="tab-content" id="strTabContent">
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- TAB 1: 1-Hour Frequency Groups (Under Merchant)                     -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade show active" id="hourly-groups" role="tabpanel">
+            <!-- 1-Hour Frequency Summary Cards -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="card stat-card border-warning" style="background: rgba(245, 158, 11, 0.06);">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-secondary text-uppercase fw-semibold" style="font-size: 0.75rem;">1-Hour Groups</small>
+                                    <h2 class="text-warning mb-0 fw-bold">{{ hourly_data.summary.total_groups }}</h2>
+                                    <small class="text-secondary">{{ hourly_data.summary.total_merchants }} Merchants Involved</small>
+                                </div>
+                                <div class="stat-icon bg-warning-subtle text-warning border border-warning-subtle">
+                                    <i class="bi bi-clock-history"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                {% endfor %}
+                <div class="col-md-3">
+                    <div class="card stat-card border-danger" style="background: rgba(239, 68, 68, 0.06);">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-secondary text-uppercase fw-semibold" style="font-size: 0.75rem;">Peak 1-Hour Freq</small>
+                                    <h2 class="text-danger mb-0 fw-bold">{{ hourly_data.summary.max_count }} <span class="fs-6 text-muted">txns/1h</span></h2>
+                                    <small class="text-secondary text-truncate d-block" style="max-width: 170px;" title="{{ hourly_data.summary.peak_counterparty }}">
+                                        {{ hourly_data.summary.peak_counterparty }}
+                                    </small>
+                                </div>
+                                <div class="stat-icon bg-danger-subtle text-danger border border-danger-subtle">
+                                    <i class="bi bi-lightning-charge-fill"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card border-info" style="background: rgba(6, 182, 212, 0.06);">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-secondary text-uppercase fw-semibold" style="font-size: 0.75rem;">Total High-Freq Txns</small>
+                                    <h2 class="text-info mb-0 fw-bold">{{ hourly_data.summary.total_txns }}</h2>
+                                    <small class="text-secondary">Across all 1h windows</small>
+                                </div>
+                                <div class="stat-icon bg-info-subtle text-info border border-info-subtle">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card stat-card border-success" style="background: rgba(16, 185, 129, 0.06);">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-secondary text-uppercase fw-semibold" style="font-size: 0.75rem;">Total 1-Hour Volume</small>
+                                    <h3 class="text-success mb-0 fw-bold">{{ "{:,.0f}".format(hourly_data.summary.total_amount) }} <span class="fs-6 text-muted">MMK</span></h3>
+                                    <small class="text-secondary">High-frequency turnover</small>
+                                </div>
+                                <div class="stat-icon bg-success-subtle text-success border border-success-subtle">
+                                    <i class="bi bi-cash-stack"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-    {% endif %}
-    {% endif %}
 
-    <!-- Filter -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="row g-2 align-items-center">
-                <div class="col-auto">
-                    <label class="form-label mb-0">Filter by severity:</label>
+            <!-- Filter Controls for 1-Hour Groups -->
+            <div class="card mb-4" style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <div class="card-body">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-3">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-dark border-secondary border-opacity-50 text-secondary"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary border-opacity-50" id="groupSearchInput" placeholder="Search Merchant, Counterparty, Acc..." onkeyup="filterHourlyGroups()">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm bg-dark text-white border-secondary border-opacity-50" id="merchantFilterSelect" onchange="filterHourlyGroups()">
+                                <option value="">🏢 All Merchants ({{ hourly_data.merchants|length }})</option>
+                                {% for m in hourly_data.merchants %}
+                                <option value="{{ m.merchant_name }}">{{ m.merchant_name }} ({{ m.total_groups }} groups)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-sm bg-dark text-white border-secondary border-opacity-50" id="hourSlotFilterSelect" onchange="filterHourlyGroups()">
+                                <option value="">⏰ All 1-Hour Slots</option>
+                                {% for slot_label in hourly_data.available_hour_labels %}
+                                <option value="{{ slot_label }}">{{ slot_label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex gap-2 justify-content-end">
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="toggleAllGroupDetails(true)" title="Expand all detail tables">
+                                <i class="bi bi-arrows-expand"></i> Expand All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary text-light" onclick="toggleAllGroupDetails(false)" title="Collapse all detail tables">
+                                <i class="bi bi-arrows-collapse"></i> Collapse All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-light" onclick="resetHourlyFilters()">
+                                <i class="bi bi-arrow-counterclockwise"></i> Reset
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-auto">
-                    <select class="form-select form-select-sm" id="severityFilter" onchange="filterTable()">
-                        <option value="">All</option>
-                        <option value="HIGH">HIGH</option>
-                        <option value="MEDIUM">MEDIUM</option>
-                        <option value="LOW">LOW</option>
-                    </select>
-                </div>
-                <div class="col-auto">
-                    <label class="form-label mb-0">Rule:</label>
-                </div>
-                <div class="col-auto">
-                    <select class="form-select form-select-sm" id="ruleFilter" onchange="filterTable()">
-                        <option value="">All Rules</option>
-                        {% if summary and summary.by_rule %}
-                            {% for rule in summary.by_rule.keys() %}
-                            <option value="{{ rule }}">{{ rule }}</option>
+            </div>
+
+            <!-- Merchant Groups Hierarchy -->
+            <div id="merchantGroupsContainer">
+                {% if hourly_data.merchants %}
+                    {% for m in hourly_data.merchants %}
+                    <div class="merchant-group-card" data-merchant="{{ m.merchant_name | lower }}">
+                        <!-- Merchant Header -->
+                        <div class="merchant-group-header">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="stat-icon bg-warning text-dark fw-bold rounded-3" style="width: 38px; height: 38px;">
+                                    <i class="bi bi-shop fs-5"></i>
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <h5 class="mb-0 fw-bold text-white">{{ m.merchant_name }}</h5>
+                                        {% if m.merchant_party %}
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary" style="font-size: 0.72rem;">{{ m.merchant_party }}</span>
+                                        {% endif %}
+                                        {% if m.merchant_no %}
+                                        <span class="badge bg-dark border border-secondary text-light" style="font-size: 0.72rem; font-family: monospace;">No: {{ m.merchant_no }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <span class="text-secondary small">Merchant Destination Account</span>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1">
+                                    <i class="bi bi-clock-history"></i> {{ m.total_groups }} 1-Hour Groups
+                                </span>
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                    <i class="bi bi-arrow-repeat"></i> {{ m.total_txns }} Payments
+                                </span>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-bold">
+                                    Total: {{ "{:,.0f}".format(m.total_amount) }} MMK
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Slots & Counterparty Groups inside Merchant -->
+                        <div class="p-3">
+                            {% for slot in m.slots %}
+                            <div class="slot-container mb-3" data-hour="{{ slot.hour_label | lower }}" data-date="{{ slot.date_str }}">
+                                <div class="d-flex align-items-center gap-2 mb-2 pb-1 border-bottom border-secondary border-opacity-25">
+                                    <span class="badge bg-dark border border-warning text-warning px-2 py-1">
+                                        <i class="bi bi-clock"></i> 1-Hour Window: {{ slot.date_str }} ({{ slot.hour_label }})
+                                    </span>
+                                    <span class="text-secondary small">{{ slot.counterparty_groups|length }} Counterparties active in this hour</span>
+                                </div>
+
+                                {% for group in slot.counterparty_groups %}
+                                <div class="counterparty-group-box {{ 'high-severity' if group.severity == 'HIGH' else 'medium-severity' }}" 
+                                     id="card_{{ group.group_id }}"
+                                     data-counterparty="{{ group.counterparty_name | lower }} {{ group.debitor_account | lower }} {{ group.phone_no | lower }}"
+                                     data-merchant="{{ m.merchant_name | lower }}"
+                                     data-hour="{{ slot.hour_label | lower }}">
+                                    <!-- Clickable Group Bar -->
+                                    <div class="group-header-clickable d-flex flex-wrap justify-content-between align-items-center gap-2"
+                                         onclick="toggleGroupDetail('{{ group.group_id }}')">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="stat-icon {{ 'bg-danger-subtle text-danger border border-danger-subtle' if group.severity == 'HIGH' else 'bg-warning-subtle text-warning border border-warning-subtle' }}" style="width: 36px; height: 36px; border-radius: 8px;">
+                                                <i class="bi bi-person-fill fs-5"></i>
+                                            </div>
+                                            <div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="fw-bold text-white fs-6">{{ group.counterparty_name }}</span>
+                                                    {% if group.severity == 'HIGH' %}
+                                                    <span class="badge bg-danger">HIGH RISK</span>
+                                                    {% else %}
+                                                    <span class="badge bg-warning text-dark">MEDIUM</span>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="d-flex flex-wrap gap-2 text-secondary small mt-1" style="font-size: 0.75rem;">
+                                                    {% if group.debitor_account %}
+                                                    <span><i class="bi bi-credit-card"></i> Acc: <code class="text-warning">{{ group.debitor_account }}</code></span>
+                                                    {% endif %}
+                                                    {% if group.phone_no %}
+                                                    <span><i class="bi bi-telephone"></i> Phone: {{ group.phone_no }}</span>
+                                                    {% endif %}
+                                                    {% if group.customer_party %}
+                                                    <span><i class="bi bi-bank"></i> {{ group.customer_party }}</span>
+                                                    {% endif %}
+                                                    <span><i class="bi bi-stopwatch"></i> Window: {{ group.min_time }} - {{ group.max_time }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="text-end">
+                                                <span class="badge bg-danger fs-6 px-3 py-1 fw-bold">
+                                                    <i class="bi bi-arrow-repeat"></i> {{ group.count }} Payments / 1h
+                                                </span>
+                                                <div class="text-light fw-bold small mt-1">
+                                                    Total: <span class="text-warning">{{ "{:,.0f}".format(group.total_amount) }} MMK</span>
+                                                    <span class="text-secondary fw-normal">({{ "{:,.0f}".format(group.avg_amount) }} avg)</span>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-warning px-3 py-1" onclick="event.stopPropagation(); toggleGroupDetail('{{ group.group_id }}');">
+                                                <i class="bi bi-list-check"></i> Details ({{ group.count }})
+                                                <i class="bi bi-chevron-down ms-1" id="chevron_{{ group.group_id }}"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Collapsible Group Detail Panel (Shown on Click) -->
+                                    <div class="group-detail-panel" id="detail_{{ group.group_id }}" style="display: none;">
+                                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom border-secondary border-opacity-25">
+                                            <div class="small text-secondary">
+                                                <i class="bi bi-info-circle text-warning me-1"></i>
+                                                Detailed transfer payments by <strong class="text-white">{{ group.counterparty_name }}</strong> to <strong class="text-white">{{ m.merchant_name }}</strong> within <strong>{{ slot.hour_label }}</strong>:
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <a href="{{ url_for('export_hourly_group_csv', group_id=group.group_id) }}" class="btn btn-xs btn-sm btn-outline-success">
+                                                    <i class="bi bi-download"></i> Export Group CSV
+                                                </a>
+                                                <button type="button" class="btn btn-xs btn-sm btn-outline-info" onclick="filterMainTableByParty('{{ group.counterparty_name }}')">
+                                                    <i class="bi bi-funnel"></i> View in STR Table
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover group-detail-table mb-1">
+                                                <thead>
+                                                    <tr>
+                                                        <th>#</th>
+                                                        <th>Time</th>
+                                                        <th>Txn ID</th>
+                                                        <th class="text-end">Amount (MMK)</th>
+                                                        <th>Debitor Name</th>
+                                                        <th>Debitor Account</th>
+                                                        <th>Customer Party</th>
+                                                        <th>Status</th>
+                                                        <th>Clearing Ref</th>
+                                                        {% for col, label in visible_cols.items() %}
+                                                            {% if col not in ['Transaction Date', 'Transaction ID', 'Transaction Amount', 'Debitor Name', 'Debitor Account', 'Customer Party', 'Status', 'Clearing System Ref'] %}
+                                                            <th class="{% if 'amount' in col|lower or 'fee' in col|lower %}text-end{% endif %}">{{ label }}</th>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for row in group.transactions %}
+                                                    <tr>
+                                                        <td>{{ loop.index }}</td>
+                                                        <td><code class="text-warning">{{ row|get_cell('Transaction Date') }}</code></td>
+                                                        <td><span class="text-light font-monospace small">{{ row|get_cell('Transaction ID') }}</span></td>
+                                                        <td class="text-end fw-bold text-success">{{ row|get_cell('Transaction Amount')|format_cell('amount') }}</td>
+                                                        <td>{{ row|get_cell('Debitor Name') }}</td>
+                                                        <td><code class="text-light">{{ row|get_cell('Debitor Account') }}</code></td>
+                                                        <td><span class="badge bg-secondary-subtle text-secondary">{{ row|get_cell('Customer Party') }}</span></td>
+                                                        <td>
+                                                            {% if row|get_cell('Status') == 'SUCCESS' %}
+                                                            <span class="badge bg-success-subtle text-success">SUCCESS</span>
+                                                            {% else %}
+                                                            <span class="badge bg-secondary">{{ row|get_cell('Status') }}</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td><small class="text-muted font-monospace">{{ row|get_cell('Clearing System Ref') }}</small></td>
+                                                        {% for col, label in visible_cols.items() %}
+                                                            {% if col not in ['Transaction Date', 'Transaction ID', 'Transaction Amount', 'Debitor Name', 'Debitor Account', 'Customer Party', 'Status', 'Clearing System Ref'] %}
+                                                            <td class="{% if 'amount' in col|lower or 'fee' in col|lower %}text-end{% endif %}">
+                                                                {{ row|get_cell(col)|format_cell(col) }}
+                                                            </td>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                                <tfoot>
+                                                    <tr class="fw-bold border-top border-secondary">
+                                                        <td colspan="3" class="text-end text-secondary">Group Total ({{ group.count }} Txns):</td>
+                                                        <td class="text-end text-warning fs-6">{{ "{:,.0f}".format(group.total_amount) }} MMK</td>
+                                                        <td colspan="5" class="text-secondary small">Average: {{ "{:,.0f}".format(group.avg_amount) }} MMK per transaction</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
                             {% endfor %}
-                        {% endif %}
-                    </select>
-                </div>
-                <div class="col-auto">
-                    <input type="text" class="form-control form-control-sm" id="searchInput" placeholder="Search..." onkeyup="filterTable()">
-                </div>
-                <div class="col-auto ms-auto d-flex gap-2">
-                    <a href="{{ url_for('settings') }}#columns" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-sliders"></i> Choose Columns
-                    </a>
-                    <button class="btn btn-sm btn-outline-success" onclick="exportTableCSV('strTable', 'str_report')">
-                        <i class="bi bi-download"></i> Export CSV
-                    </button>
-                </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-clock-history fs-1 text-warning mb-2 d-block"></i>
+                        <h5 class="text-white">No 1-Hour Counterparty High-Frequency Groups Found</h5>
+                        <p class="text-secondary small">Upload Excel transaction data or reduce the frequency threshold.</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
-    </div>
 
-    <!-- Results Table -->
-    <div class="card shadow-sm">
-        <div class="card-body table-responsive">
-            {% if results %}
-            <table class="table table-hover table-sm" id="strTable">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Severity</th>
-                        <th>Rule</th>
-                        {% for col, label in visible_cols.items() %}
-                        <th class="{% if 'amount' in col|lower or 'fee' in col|lower or 'expense' in col|lower or 'income' in col|lower or 'mdr' in col|lower %}text-end{% endif %}">{{ label }}</th>
-                        {% endfor %}
-                        <th>Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in results %}
-                    <tr data-severity="{{ row.severity }}" data-rule="{{ row.rule }}">
-                        <td>{{ loop.index }}</td>
-                        <td>
-                            {% if row.severity == 'HIGH' %}
-                                <span class="badge bg-danger">HIGH</span>
-                            {% elif row.severity == 'MEDIUM' %}
-                                <span class="badge bg-warning text-dark">MEDIUM</span>
-                            {% else %}
-                                <span class="badge bg-info">LOW</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ row.rule }}</td>
-                        {% for col, label in visible_cols.items() %}
-                        <td class="{% if 'amount' in col|lower or 'fee' in col|lower or 'expense' in col|lower or 'income' in col|lower or 'mdr' in col|lower %}text-end fw-semibold{% endif %}">
-                            {{ row|get_cell(col)|format_cell(col) }}
-                        </td>
-                        {% endfor %}
-                        <td class="small">{{ row.details }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-shield-check fs-1 text-success"></i>
-                <h5 class="mt-3">No Suspicious Transactions Detected</h5>
-                <p class="text-muted">Upload transaction data to run STR analysis</p>
-                <a href="{{ url_for('upload') }}" class="btn btn-primary">Upload Data</a>
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <!-- TAB 2: All Flagged STR Records Table                                -->
+        <!-- ═══════════════════════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="all-records" role="tabpanel">
+            <!-- Filter Bar for Flat Table -->
+            <div class="card mb-4" style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <div class="card-body">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-auto">
+                            <label class="form-label mb-0 text-secondary small">Severity:</label>
+                        </div>
+                        <div class="col-auto">
+                            <select class="form-select form-select-sm bg-dark text-white border-secondary border-opacity-50" id="severityFilter" onchange="filterTable()">
+                                <option value="">All</option>
+                                <option value="HIGH">HIGH</option>
+                                <option value="MEDIUM">MEDIUM</option>
+                                <option value="LOW">LOW</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label mb-0 text-secondary small">Rule:</label>
+                        </div>
+                        <div class="col-auto">
+                            <select class="form-select form-select-sm bg-dark text-white border-secondary border-opacity-50" id="ruleFilter" onchange="filterTable()">
+                                <option value="">All Rules</option>
+                                {% if summary and summary.by_rule %}
+                                    {% for rule in summary.by_rule.keys() %}
+                                    <option value="{{ rule }}">{{ rule }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary border-opacity-50" id="searchInput" placeholder="Search table..." onkeyup="filterTable()">
+                        </div>
+                    </div>
+                </div>
             </div>
-            {% endif %}
+
+            <!-- Full STR Table -->
+            <div class="card shadow-sm" style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <div class="card-body table-responsive p-0">
+                    {% if results %}
+                    <table class="table table-hover table-sm mb-0" id="strTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>#</th>
+                                <th>Severity</th>
+                                <th>Rule</th>
+                                {% for col, label in visible_cols.items() %}
+                                <th class="{% if 'amount' in col|lower or 'fee' in col|lower or 'expense' in col|lower or 'income' in col|lower or 'mdr' in col|lower %}text-end{% endif %}">{{ label }}</th>
+                                {% endfor %}
+                                <th>Details / Group Link</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in results %}
+                            <tr data-severity="{{ row.severity }}" data-rule="{{ row.rule }}">
+                                <td>{{ loop.index }}</td>
+                                <td>
+                                    {% if row.severity == 'HIGH' %}
+                                        <span class="badge bg-danger">HIGH</span>
+                                    {% elif row.severity == 'MEDIUM' %}
+                                        <span class="badge bg-warning text-dark">MEDIUM</span>
+                                    {% else %}
+                                        <span class="badge bg-info">LOW</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="fw-semibold">{{ row.rule }}</span>
+                                </td>
+                                {% for col, label in visible_cols.items() %}
+                                <td class="{% if 'amount' in col|lower or 'fee' in col|lower or 'expense' in col|lower or 'income' in col|lower or 'mdr' in col|lower %}text-end fw-semibold text-warning{% endif %}">
+                                    {{ row|get_cell(col)|format_cell(col) }}
+                                </td>
+                                {% endfor %}
+                                <td>
+                                    <span class="small d-block">{{ row.details }}</span>
+                                    {% if row.hourly_group_id %}
+                                    <button type="button" class="btn btn-xs btn-outline-warning mt-1" style="font-size: 0.72rem; padding: 2px 8px;" onclick="openHourlyGroupTab('{{ row.hourly_group_id }}')">
+                                        <i class="bi bi-clock-history"></i> Jump to 1h Group ({{ row.frequency_count }} txns) &rarr;
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-shield-check fs-1 text-success"></i>
+                        <h5 class="mt-3 text-white">No Suspicious Transactions Detected</h5>
+                        <p class="text-secondary small">Upload transaction data to run STR analysis</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -161,6 +445,128 @@
 
 {% block extra_js %}
 <script>
+// Toggle individual group detail row
+function toggleGroupDetail(groupId) {
+    const panel = document.getElementById('detail_' + groupId);
+    const chevron = document.getElementById('chevron_' + groupId);
+    if (!panel) return;
+    
+    if (panel.style.display === 'none' || !panel.style.display) {
+        panel.style.display = 'block';
+        if (chevron) {
+            chevron.classList.remove('bi-chevron-down');
+            chevron.classList.add('bi-chevron-up');
+        }
+    } else {
+        panel.style.display = 'none';
+        if (chevron) {
+            chevron.classList.remove('bi-chevron-up');
+            chevron.classList.add('bi-chevron-down');
+        }
+    }
+}
+
+// Expand or collapse all group details
+function toggleAllGroupDetails(expand) {
+    document.querySelectorAll('.group-detail-panel').forEach(panel => {
+        panel.style.display = expand ? 'block' : 'none';
+    });
+    document.querySelectorAll('[id^="chevron_"]').forEach(chevron => {
+        if (expand) {
+            chevron.classList.remove('bi-chevron-down');
+            chevron.classList.add('bi-chevron-up');
+        } else {
+            chevron.classList.remove('bi-chevron-up');
+            chevron.classList.add('bi-chevron-down');
+        }
+    });
+}
+
+// Filter 1-Hour Groups
+function filterHourlyGroups() {
+    const q = (document.getElementById('groupSearchInput').value || '').toLowerCase().trim();
+    const merch = (document.getElementById('merchantFilterSelect').value || '').toLowerCase().trim();
+    const hour = (document.getElementById('hourSlotFilterSelect').value || '').toLowerCase().trim();
+
+    document.querySelectorAll('.merchant-group-card').forEach(merchCard => {
+        const cardMerch = (merchCard.getAttribute('data-merchant') || '').toLowerCase();
+        let merchHasVisibleGroups = false;
+
+        merchCard.querySelectorAll('.slot-container').forEach(slotContainer => {
+            const slotHour = (slotContainer.getAttribute('data-hour') || '').toLowerCase();
+            let slotHasVisibleGroups = false;
+
+            slotContainer.querySelectorAll('.counterparty-group-box').forEach(groupBox => {
+                const cpText = (groupBox.getAttribute('data-counterparty') || '').toLowerCase();
+                const gbMerch = (groupBox.getAttribute('data-merchant') || '').toLowerCase();
+                const gbHour = (groupBox.getAttribute('data-hour') || '').toLowerCase();
+
+                const matchQ = !q || cpText.includes(q) || gbMerch.includes(q);
+                const matchMerch = !merch || gbMerch.includes(merch);
+                const matchHour = !hour || gbHour.includes(hour);
+
+                if (matchQ && matchMerch && matchHour) {
+                    groupBox.style.display = '';
+                    slotHasVisibleGroups = true;
+                    merchHasVisibleGroups = true;
+                } else {
+                    groupBox.style.display = 'none';
+                }
+            });
+
+            slotContainer.style.display = slotHasVisibleGroups ? '' : 'none';
+        });
+
+        merchCard.style.display = merchHasVisibleGroups ? '' : 'none';
+    });
+}
+
+function resetHourlyFilters() {
+    document.getElementById('groupSearchInput').value = '';
+    document.getElementById('merchantFilterSelect').value = '';
+    document.getElementById('hourSlotFilterSelect').value = '';
+    filterHourlyGroups();
+}
+
+// Navigate from flat table to 1-hour group tab
+function openHourlyGroupTab(groupId) {
+    const tabTrigger = new bootstrap.Tab(document.getElementById('hourly-groups-tab'));
+    tabTrigger.show();
+    
+    // Open target group and scroll to it
+    setTimeout(() => {
+        const panel = document.getElementById('detail_' + groupId);
+        const card = document.getElementById('card_' + groupId);
+        if (panel) {
+            panel.style.display = 'block';
+            const chevron = document.getElementById('chevron_' + groupId);
+            if (chevron) {
+                chevron.classList.remove('bi-chevron-down');
+                chevron.classList.add('bi-chevron-up');
+            }
+        }
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.style.boxShadow = '0 0 25px rgba(245, 158, 11, 0.7)';
+            setTimeout(() => {
+                card.style.boxShadow = '';
+            }, 3000);
+        }
+    }, 150);
+}
+
+// Filter flat table by counterparty name
+function filterMainTableByParty(name) {
+    const tabTrigger = new bootstrap.Tab(document.getElementById('all-records-tab'));
+    tabTrigger.show();
+    const search = document.getElementById('searchInput');
+    if (search) {
+        search.value = name;
+        filterTable();
+    }
+}
+
+// Filter flat STR table
 function filterTable() {
     const severity = document.getElementById('severityFilter').value;
     const rule = document.getElementById('ruleFilter').value;

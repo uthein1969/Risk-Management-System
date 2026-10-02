@@ -1,173 +1,483 @@
 {% extends "base.html" %}
 {% block title %}Upload Data - Risk Management{% endblock %}
-{% block page_title %}Upload Data{% endblock %}
+{% block page_title %}Upload Data & Excel Management{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Active Data Status Banner -->
+    <div class="card mb-4 border-0 shadow-sm" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-left: 4px solid #10b981 !important;">
+        <div class="card-body p-4">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);">
+                        <i class="bi bi-file-earmark-spreadsheet-fill fs-3 text-success"></i>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <h5 class="mb-0 text-white fw-bold">Active System Dataset</h5>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                <i class="bi bi-check-circle-fill me-1"></i> Data Ready
+                            </span>
+                        </div>
+                        <p class="text-secondary mb-0 small mt-1">
+                            Currently analyzed file: <strong class="text-info">{{ overview.transactions.filename }}</strong>
+                            {% if overview.transactions.count > 0 %}
+                            &bull; <span class="text-light">{{ "{:,}".format(overview.transactions.count) }} Transactions</span>
+                            &bull; <span class="text-warning">{{ "{:,.0f}".format(overview.transactions.total_amount) }} MMK Total Volume</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('str_report') }}" class="btn btn-sm btn-warning fw-semibold px-3 shadow-sm">
+                        <i class="bi bi-clock-history me-1"></i> 1-Hour Frequency STR Report
+                    </a>
+                    <a href="{{ url_for('ttr_report') }}" class="btn btn-sm btn-info fw-semibold px-3 shadow-sm">
+                        <i class="bi bi-cash-stack me-1"></i> TTR Report
+                    </a>
+                    <a href="{{ url_for('blacklist_check') }}" class="btn btn-sm btn-danger fw-semibold px-3 shadow-sm">
+                        <i class="bi bi-shield-exclamation me-1"></i> Blacklist ({{ overview.blacklist.count }})
+                    </a>
+                    <a href="{{ url_for('settings') }}#columns" class="btn btn-sm btn-outline-light px-3">
+                        <i class="bi bi-sliders me-1"></i> Configure Columns ({{ overview.transactions.columns_count }})
+                    </a>
+                </div>
+            </div>
+
+            <!-- Quick Metrics Grid -->
+            <div class="row g-3 mt-2 pt-3 border-top border-secondary border-opacity-25">
+                <div class="col-6 col-md-3">
+                    <div class="p-2 rounded" style="background: rgba(255, 255, 255, 0.03);">
+                        <small class="text-secondary d-block" style="font-size: 0.75rem;">TRANSACTIONS LOADED</small>
+                        <span class="fs-5 fw-bold text-white">{{ "{:,}".format(overview.transactions.count) }}</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-2 rounded" style="background: rgba(255, 255, 255, 0.03);">
+                        <small class="text-secondary d-block" style="font-size: 0.75rem;">DATE RANGE</small>
+                        <span class="small fw-semibold text-info d-block text-truncate" title="{{ overview.transactions.min_date }} to {{ overview.transactions.max_date }}">
+                            {{ overview.transactions.min_date[:10] }} ~ {{ overview.transactions.max_date[:10] }}
+                        </span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-2 rounded" style="background: rgba(255, 255, 255, 0.03);">
+                        <small class="text-secondary d-block" style="font-size: 0.75rem;">EXCEL COLUMNS ACTIVE</small>
+                        <span class="fs-5 fw-bold text-warning">{{ overview.transactions.columns_count }} Columns</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-2 rounded" style="background: rgba(255, 255, 255, 0.03);">
+                        <small class="text-secondary d-block" style="font-size: 0.75rem;">BLACKLIST REGISTRY</small>
+                        <span class="fs-5 fw-bold text-danger">{{ overview.blacklist.count }} Records</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row g-4">
         <!-- Upload Form -->
         <div class="col-lg-8">
             <form method="POST" enctype="multipart/form-data" id="uploadForm">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h6 class="mb-0"><i class="bi bi-file-earmark-excel"></i> Upload Excel Files</h6>
+                <div class="card mb-4 border-0 shadow-sm" style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1) !important;">
+                    <div class="card-header py-3" style="background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <h6 class="mb-0 text-white fw-bold">
+                                <i class="bi bi-cloud-arrow-up-fill text-primary me-2"></i> Upload New Excel / CSV Data
+                            </h6>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">MMQR & Bank Formats Auto-Detected</span>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <p class="text-muted mb-4">Upload your data files (.xlsx, .xls, or .csv) for risk analysis. <strong>MMQR format auto-detected!</strong> Each file should contain specific columns as per the templates below.</p>
+                    <div class="card-body p-4">
+                        <p class="text-secondary mb-4 small">
+                            Upload your Excel workbook (.xlsx, .xls) or CSV data. Multi-sheet workbooks are intelligently parsed, automatically selecting the transaction data sheet and ignoring metadata sheets.
+                        </p>
 
-                        <!-- Transactions -->
+                        <!-- Transactions Dropzone -->
                         <div class="upload-section mb-4">
-                            <label class="form-label fw-bold">
-                                <i class="bi bi-arrow-left-right text-primary"></i> Transactions Data
-                            </label>
-                            <div class="upload-area" id="txnUploadArea">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-bold text-white mb-0">
+                                    <i class="bi bi-arrow-left-right text-primary me-1"></i> Transactions File
+                                </label>
+                                {% if file_names.get('transactions') %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                    Current: {{ file_names.transactions }} ({{ "{:,}".format(overview.transactions.count) }} rows)
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="upload-area p-4 rounded-3 text-center" id="txnUploadArea" style="background: rgba(30, 41, 59, 0.5); border: 2px dashed rgba(59, 130, 246, 0.4); cursor: pointer;">
                                 <input type="file" name="transactions_file" id="txnFile" accept=".xlsx,.xls,.csv" class="d-none" onchange="handleFileSelect(this, 'txn')">
                                 <div class="upload-placeholder" onclick="document.getElementById('txnFile').click()">
-                                    <i class="bi bi-cloud-arrow-up fs-1 text-primary"></i>
-                                    <p class="mb-1">Click to upload or drag & drop (.xlsx / .csv)</p>
-                                    <small class="text-muted">Required columns: transaction_id, account_id, amount, transaction_date, transaction_type</small>
+                                    <i class="bi bi-file-earmark-excel fs-1 text-primary"></i>
+                                    <p class="mb-1 text-white fw-semibold">Click to select or drag & drop MMQR Transactions Excel</p>
+                                    <small class="text-secondary">Supports 28 MMQR columns (Transaction Date, Transaction ID, Debitor Name, Merchant No, Amount, etc.)</small>
                                 </div>
-                                <div class="upload-selected d-none" id="txnSelected">
-                                    <i class="bi bi-file-earmark-excel text-success fs-3"></i>
-                                    <div>
-                                        <p class="mb-0 fw-bold" id="txnFileName">-</p>
-                                        <small class="text-muted" id="txnFileSize">-</small>
+                                <div class="upload-selected d-none text-start p-2" id="txnSelected">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <i class="bi bi-check-circle-fill text-success fs-2"></i>
+                                        <div>
+                                            <p class="mb-0 fw-bold text-white" id="txnFileName">-</p>
+                                            <small class="text-secondary" id="txnFileSize">-</small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile('txn')">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
                                     </div>
-                                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile('txn')">
-                                        <i class="bi bi-x"></i>
-                                    </button>
                                 </div>
                             </div>
-                            <a href="{{ url_for('download_template', template_type='transactions') }}" class="btn btn-sm btn-link px-0">
-                                <i class="bi bi-download"></i> Download template
-                            </a>
-                        </div>
-
-                        <!-- Merchants -->
-                        <div class="upload-section mb-4">
-                            <label class="form-label fw-bold">
-                                <i class="bi bi-shop text-info"></i> Merchants Data
-                            </label>
-                            <div class="upload-area" id="merchantUploadArea">
-                                <input type="file" name="merchants_file" id="merchantFile" accept=".xlsx,.xls,.csv" class="d-none" onchange="handleFileSelect(this, 'merchant')">
-                                <div class="upload-placeholder" onclick="document.getElementById('merchantFile').click()">
-                                    <i class="bi bi-cloud-arrow-up fs-1 text-info"></i>
-                                    <p class="mb-1">Click to upload or drag & drop (.xlsx / .csv)</p>
-                                    <small class="text-muted">Required columns: merchant_id, merchant_name, business_type, registration_date, owner_name, license_number, license_expiry</small>
-                                </div>
-                                <div class="upload-selected d-none" id="merchantSelected">
-                                    <i class="bi bi-file-earmark-excel text-success fs-3"></i>
-                                    <div>
-                                        <p class="mb-0 fw-bold" id="merchantFileName">-</p>
-                                        <small class="text-muted" id="merchantFileSize">-</small>
-                                    </div>
-                                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile('merchant')">
-                                        <i class="bi bi-x"></i>
-                                    </button>
-                                </div>
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <a href="{{ url_for('download_template', template_type='mmqr') }}" class="btn btn-sm btn-link text-decoration-none px-0 text-info">
+                                    <i class="bi bi-download me-1"></i> Download 28-Column MMQR Template (.csv)
+                                </a>
+                                <small class="text-secondary">Auto-maps all counterparty & merchant fields</small>
                             </div>
-                            <a href="{{ url_for('download_template', template_type='merchants') }}" class="btn btn-sm btn-link px-0">
-                                <i class="bi bi-download"></i> Download template
-                            </a>
                         </div>
 
-                        <!-- Blacklist -->
+                        <!-- Blacklist Dropzone -->
                         <div class="upload-section mb-4">
-                            <label class="form-label fw-bold">
-                                <i class="bi bi-person-x text-danger"></i> Blacklist Data
-                            </label>
-                            <div class="upload-area" id="blUploadArea">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-bold text-white mb-0">
+                                    <i class="bi bi-shield-x text-danger me-1"></i> Blacklist File
+                                </label>
+                                {% if file_names.get('blacklist') %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                    Current: {{ file_names.blacklist }} ({{ overview.blacklist.count }} entities)
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="upload-area p-4 rounded-3 text-center" id="blUploadArea" style="background: rgba(30, 41, 59, 0.5); border: 2px dashed rgba(239, 68, 68, 0.4); cursor: pointer;">
                                 <input type="file" name="blacklist_file" id="blFile" accept=".xlsx,.xls,.csv" class="d-none" onchange="handleFileSelect(this, 'bl')">
                                 <div class="upload-placeholder" onclick="document.getElementById('blFile').click()">
-                                    <i class="bi bi-cloud-arrow-up fs-1 text-danger"></i>
-                                    <p class="mb-1">Click to upload or drag & drop (.xlsx / .csv)</p>
-                                    <small class="text-muted">Columns: account_id, merchant_id, name, phone, nrc, reason, date_added</small>
+                                    <i class="bi bi-shield-lock-fill fs-1 text-danger"></i>
+                                    <p class="mb-1 text-white fw-semibold">Click to select or drag & drop Blacklist File (.xlsx / .csv)</p>
+                                    <small class="text-secondary">Supports Excel Blacklist exports (Name, Father Name, IDType, NRC/Passport, PhoneNumber)</small>
                                 </div>
-                                <div class="upload-selected d-none" id="blSelected">
-                                    <i class="bi bi-file-earmark-excel text-success fs-3"></i>
-                                    <div>
-                                        <p class="mb-0 fw-bold" id="blFileName">-</p>
-                                        <small class="text-muted" id="blFileSize">-</small>
+                                <div class="upload-selected d-none text-start p-2" id="blSelected">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <i class="bi bi-check-circle-fill text-success fs-2"></i>
+                                        <div>
+                                            <p class="mb-0 fw-bold text-white" id="blFileName">-</p>
+                                            <small class="text-secondary" id="blFileSize">-</small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile('bl')">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
                                     </div>
-                                    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile('bl')">
-                                        <i class="bi bi-x"></i>
-                                    </button>
                                 </div>
                             </div>
-                            <a href="{{ url_for('download_template', template_type='blacklist') }}" class="btn btn-sm btn-link px-0">
-                                <i class="bi bi-download"></i> Download template
+                            <a href="{{ url_for('download_template', template_type='blacklist') }}" class="btn btn-sm btn-link text-decoration-none px-0 text-danger mt-1">
+                                <i class="bi bi-download me-1"></i> Download Blacklist Template (.csv)
                             </a>
                         </div>
+
+                        <!-- Merchants Dropzone -->
+                        <div class="upload-section mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-bold text-white mb-0">
+                                    <i class="bi bi-shop text-info me-1"></i> Merchants File (Optional)
+                                </label>
+                                {% if file_names.get('merchants') %}
+                                <span class="badge bg-info-subtle text-info border border-info-subtle">
+                                    Current: {{ file_names.merchants }} ({{ overview.merchants.count }} merchants)
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="upload-area p-3 rounded-3 text-center" id="merchantUploadArea" style="background: rgba(30, 41, 59, 0.5); border: 2px dashed rgba(6, 182, 212, 0.4); cursor: pointer;">
+                                <input type="file" name="merchants_file" id="merchantFile" accept=".xlsx,.xls,.csv" class="d-none" onchange="handleFileSelect(this, 'merchant')">
+                                <div class="upload-placeholder" onclick="document.getElementById('merchantFile').click()">
+                                    <i class="bi bi-cloud-arrow-up fs-2 text-info"></i>
+                                    <p class="mb-0 text-white small fw-semibold">Click to select Merchants file (.xlsx / .csv)</p>
+                                </div>
+                                <div class="upload-selected d-none text-start p-2" id="merchantSelected">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <i class="bi bi-check-circle-fill text-success fs-3"></i>
+                                        <div>
+                                            <p class="mb-0 fw-bold text-white small" id="merchantFileName">-</p>
+                                            <small class="text-secondary" id="merchantFileSize">-</small>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="clearFile('merchant')">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-footer">
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-upload"></i> Upload & Analyze
+                    <div class="card-footer py-3" style="background: rgba(255, 255, 255, 0.02); border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <button type="submit" class="btn btn-primary px-4 py-2 fw-bold shadow-sm">
+                                <i class="bi bi-upload me-1"></i> Upload & Process Files
                             </button>
-                            <a href="{{ url_for('download_template', template_type='mmqr') }}" class="btn btn-outline-secondary">
-                                <i class="bi bi-download"></i> Download MMQR Template
-                            </a>
+                            <small class="text-secondary">Data is processed instantly and saved to the risk database</small>
                         </div>
                     </div>
                 </div>
             </form>
         </div>
 
-        <!-- Info Panel -->
+        <!-- Info & Status Panel -->
         <div class="col-lg-4">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> File Requirements</h6>
+            <div class="card mb-4 border-0 shadow-sm" style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1) !important;">
+                <div class="card-header py-3" style="background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <h6 class="mb-0 text-white fw-bold">
+                        <i class="bi bi-folder-check text-success me-2"></i> Currently Loaded Datasets
+                    </h6>
                 </div>
-                <div class="card-body">
-                    <h6 class="text-primary">Transactions</h6>
-                    <ul class="small mb-3">
-                        <li><code>transaction_id</code> - Unique ID</li>
-                        <li><code>account_id</code> - Account identifier</li>
-                        <li><code>amount</code> - Transaction amount</li>
-                        <li><code>transaction_date</code> - Date (YYYY-MM-DD)</li>
-                        <li><code>transaction_type</code> - Transfer/Withdrawal/Deposit</li>
-                    </ul>
+                <div class="card-body p-3">
+                    <!-- Transactions Info Card -->
+                    <div class="p-3 rounded-3 mb-3" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2);">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="badge bg-primary text-white fw-bold">TRANSACTIONS</span>
+                            <span class="badge bg-dark text-info border border-secondary border-opacity-50">{{ "{:,}".format(overview.transactions.count) }} Rows</span>
+                        </div>
+                        <p class="text-white fw-semibold mb-1 mt-2 text-truncate" title="{{ overview.transactions.filename }}">
+                            {{ overview.transactions.filename }}
+                        </p>
+                        <div class="small text-secondary">
+                            <div><i class="bi bi-currency-exchange me-1"></i> Volume: <strong class="text-light">{{ "{:,.0f}".format(overview.transactions.total_amount) }} MMK</strong></div>
+                            <div><i class="bi bi-calendar-event me-1"></i> Period: <strong class="text-light">{{ overview.transactions.min_date[:10] }} to {{ overview.transactions.max_date[:10] }}</strong></div>
+                            <div><i class="bi bi-layout-three-columns me-1"></i> Columns: <strong class="text-warning">{{ overview.transactions.columns_count }} headers mapped</strong></div>
+                        </div>
+                    </div>
 
-                    <h6 class="text-info">Merchants</h6>
-                    <ul class="small mb-3">
-                        <li><code>merchant_id</code> - Unique ID</li>
-                        <li><code>merchant_name</code> - Business name</li>
-                        <li><code>business_type</code> - Type of business</li>
-                        <li><code>owner_name</code> - Owner's name</li>
-                        <li><code>license_number</code> - License ID</li>
-                        <li><code>license_expiry</code> - Expiry date</li>
-                    </ul>
+                    <!-- Blacklist Info Card -->
+                    <div class="p-3 rounded-3 mb-3" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2);">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="badge bg-danger text-white fw-bold">BLACKLIST REGISTRY</span>
+                            <span class="badge bg-dark text-danger border border-secondary border-opacity-50">{{ overview.blacklist.count }} Entities</span>
+                        </div>
+                        <p class="text-white fw-semibold mb-1 mt-2 text-truncate" title="{{ overview.blacklist.filename }}">
+                            {{ overview.blacklist.filename }}
+                        </p>
+                        <small class="text-secondary d-block">
+                            Includes names, NRC numbers, phone numbers, and father names for screening.
+                        </small>
+                    </div>
 
-                    <h6 class="text-danger">Blacklist</h6>
-                    <ul class="small mb-0">
-                        <li><code>account_id</code> - Flagged account</li>
-                        <li><code>merchant_id</code> - Flagged merchant</li>
-                        <li><code>name</code> - Flagged person</li>
-                        <li><code>phone</code> / <code>nrc</code> - Identifiers</li>
-                        <li><code>reason</code> - Blacklist reason</li>
-                    </ul>
+                    <!-- Merchants Info Card -->
+                    <div class="p-3 rounded-3" style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2);">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="badge bg-info text-dark fw-bold">MERCHANTS</span>
+                            <span class="badge bg-dark text-info border border-secondary border-opacity-50">{{ overview.merchants.count }} Accounts</span>
+                        </div>
+                        <p class="text-white fw-semibold mb-1 mt-2 text-truncate" title="{{ overview.merchants.filename }}">
+                            {{ overview.merchants.filename }}
+                        </p>
+                        <small class="text-secondary d-block">
+                            Profiles, business types, and registration dates for KYC analysis.
+                        </small>
+                    </div>
                 </div>
             </div>
 
-            {% if file_names %}
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="bi bi-folder"></i> Currently Loaded</h6>
-                </div>
-                <div class="card-body">
-                    {% if file_names.get('transactions') %}
-                    <p class="mb-1"><i class="bi bi-check-circle text-success"></i> <strong>Transactions:</strong> {{ file_names.transactions }}</p>
-                    {% endif %}
-                    {% if file_names.get('merchants') %}
-                    <p class="mb-1"><i class="bi bi-check-circle text-success"></i> <strong>Merchants:</strong> {{ file_names.merchants }}</p>
-                    {% endif %}
-                    {% if file_names.get('blacklist') %}
-                    <p class="mb-0"><i class="bi bi-check-circle text-success"></i> <strong>Blacklist:</strong> {{ file_names.blacklist }}</p>
-                    {% endif %}
+            <!-- Fast Navigation Card -->
+            <div class="card border-0 shadow-sm" style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1) !important;">
+                <div class="card-body p-3">
+                    <h6 class="text-white fw-bold mb-2 small text-uppercase">Direct Actions</h6>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('str_report') }}" class="btn btn-outline-warning btn-sm text-start py-2">
+                            <i class="bi bi-clock-history me-2"></i> <strong>STR 1-Hour Frequency Report</strong>
+                            <div class="small text-secondary ps-4">View payments grouped by merchant and 1-hour slots</div>
+                        </a>
+                        <a href="{{ url_for('ttr_report') }}" class="btn btn-outline-info btn-sm text-start py-2">
+                            <i class="bi bi-cash-stack me-2"></i> <strong>TTR Large Transaction Report</strong>
+                            <div class="small text-secondary ps-4">Threshold monitoring & large sum transfers</div>
+                        </a>
+                        <a href="{{ url_for('blacklist_check') }}" class="btn btn-outline-danger btn-sm text-start py-2">
+                            <i class="bi bi-shield-x me-2"></i> <strong>Blacklist Database & Screening</strong>
+                            <div class="small text-secondary ps-4">Browse 126 blacklisted entities & matched hits</div>
+                        </a>
+                    </div>
                 </div>
             </div>
-            {% endif %}
+        </div>
+    </div>
+
+    <!-- Live Data Explorer & Tables Preview Section -->
+    <div class="row mt-4" id="data-overview">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm" style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1) !important;">
+                <div class="card-header py-3" style="background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-table fs-5 text-warning"></i>
+                            <h6 class="mb-0 text-white fw-bold">Live Data Explorer & Uploaded Tables Preview</h6>
+                        </div>
+                        <!-- Preview Tabs -->
+                        <ul class="nav nav-pills nav-pills-sm gap-2" id="previewTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active btn-sm" id="prev-txn-tab" data-bs-toggle="pill" data-bs-target="#prev-txn" type="button" role="tab">
+                                    <i class="bi bi-arrow-left-right me-1"></i> Transactions ({{ "{:,}".format(overview.transactions.count) }})
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link btn-sm" id="prev-bl-tab" data-bs-toggle="pill" data-bs-target="#prev-bl" type="button" role="tab">
+                                    <i class="bi bi-shield-slash me-1"></i> Blacklist Registry ({{ overview.blacklist.count }})
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link btn-sm" id="prev-merch-tab" data-bs-toggle="pill" data-bs-target="#prev-merch" type="button" role="tab">
+                                    <i class="bi bi-shop me-1"></i> Merchants ({{ overview.merchants.count }})
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card-body p-4">
+                    <div class="tab-content" id="previewTabContent">
+                        <!-- TAB 1: Transactions Preview -->
+                        <div class="tab-pane fade show active" id="prev-txn" role="tabpanel">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+                                <div>
+                                    <span class="text-white fw-semibold">Sample Records from {{ overview.transactions.filename }}</span>
+                                    <span class="text-secondary small ms-2">(Showing first {{ overview.transactions.preview|length }} of {{ "{:,}".format(overview.transactions.count) }} rows)</span>
+                                </div>
+                                <a href="{{ url_for('str_report') }}" class="btn btn-sm btn-outline-warning">
+                                    <i class="bi bi-arrow-right-circle me-1"></i> Open Full STR Analysis
+                                </a>
+                            </div>
+
+                            {% if overview.transactions.preview %}
+                            <div class="table-responsive rounded-3" style="border: 1px solid rgba(255, 255, 255, 0.08);">
+                                <table class="table table-dark table-hover table-sm mb-0 align-middle">
+                                    <thead style="background: rgba(30, 41, 59, 0.8);">
+                                        <tr>
+                                            <th class="ps-3 py-2 text-secondary small">#</th>
+                                            <th class="py-2 text-secondary small">Transaction Date</th>
+                                            <th class="py-2 text-secondary small">Transaction ID</th>
+                                            <th class="py-2 text-secondary small">Counterparty (Debitor)</th>
+                                            <th class="py-2 text-secondary small">Merchant Name</th>
+                                            <th class="py-2 text-secondary small">Debitor Account</th>
+                                            <th class="py-2 text-end text-secondary small">Amount (MMK)</th>
+                                            <th class="py-2 text-center text-secondary small">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in overview.transactions.preview %}
+                                        <tr>
+                                            <td class="ps-3 text-secondary small">{{ loop.index }}</td>
+                                            <td class="text-light small text-nowrap">{{ row.get('Transaction Date') or row.get('transaction_date') or '-' }}</td>
+                                            <td><code class="text-info small">{{ row.get('Transaction ID') or row.get('transaction_id') or '-' }}</code></td>
+                                            <td class="fw-semibold text-warning">{{ row.get('Debitor Name') or row.get('counterparty') or '-' }}</td>
+                                            <td class="text-white">{{ row.get('Merchant Name') or row.get('merchant_name') or '-' }}</td>
+                                            <td class="text-secondary small font-monospace">{{ row.get('Debitor Account') or row.get('debitor_account') or '-' }}</td>
+                                            <td class="text-end fw-bold text-success">
+                                                {{ "{:,.2f}".format(safe_float(row.get('Transaction Amount') or row.get('amount', 0))) if safe_float(row.get('Transaction Amount') or row.get('amount', 0)) else (row.get('Transaction Amount') or '-') }}
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2">
+                                                    {{ row.get('Status') or row.get('status') or 'SUCCESS' }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-secondary"></i>
+                                <p class="text-secondary mt-2">No transaction data loaded yet. Please select and upload an MMQR Excel file above.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- TAB 2: Blacklist Preview -->
+                        <div class="tab-pane fade" id="prev-bl" role="tabpanel">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+                                <div>
+                                    <span class="text-white fw-semibold">Blacklisted Individuals Database</span>
+                                    <span class="text-secondary small ms-2">(Showing first {{ overview.blacklist.preview|length }} of {{ overview.blacklist.count }} entries from {{ overview.blacklist.filename }})</span>
+                                </div>
+                                <a href="{{ url_for('blacklist_check') }}" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-shield-shaded me-1"></i> Open Blacklist Screening
+                                </a>
+                            </div>
+
+                            {% if overview.blacklist.preview %}
+                            <div class="table-responsive rounded-3" style="border: 1px solid rgba(255, 255, 255, 0.08);">
+                                <table class="table table-dark table-hover table-sm mb-0 align-middle">
+                                    <thead style="background: rgba(30, 41, 59, 0.8);">
+                                        <tr>
+                                            <th class="ps-3 py-2 text-secondary small">#</th>
+                                            <th class="py-2 text-secondary small">Person Name</th>
+                                            <th class="py-2 text-secondary small">Father's Name</th>
+                                            <th class="py-2 text-secondary small">ID Type</th>
+                                            <th class="py-2 text-secondary small">NRC / Passport No</th>
+                                            <th class="py-2 text-secondary small">Phone Number</th>
+                                            <th class="py-2 text-secondary small">Reason / Flag</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in overview.blacklist.preview %}
+                                        <tr>
+                                            <td class="ps-3 text-secondary small">{{ loop.index }}</td>
+                                            <td class="fw-bold text-danger">{{ row.get('name') or row.get('Name') or '-' }}</td>
+                                            <td class="text-light">{{ row.get('father_name') or row.get('Father Name') or '-' }}</td>
+                                            <td><span class="badge bg-secondary">{{ row.get('id_type') or row.get('IDType') or 'NRC' }}</span></td>
+                                            <td><code class="text-warning small">{{ row.get('nrc') or row.get('NRC /Passport No/Company Registration No') or '-' }}</code></td>
+                                            <td class="text-info font-monospace">{{ row.get('phone') or row.get('PhoneNumber') or '-' }}</td>
+                                            <td><span class="badge bg-danger-subtle text-danger border border-danger-subtle">{{ row.get('reason') or 'Blacklist Registry' }}</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-5">
+                                <i class="bi bi-shield-check fs-1 text-secondary"></i>
+                                <p class="text-secondary mt-2">No blacklist records loaded yet.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- TAB 3: Merchants Preview -->
+                        <div class="tab-pane fade" id="prev-merch" role="tabpanel">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+                                <div>
+                                    <span class="text-white fw-semibold">Registered Merchants Database</span>
+                                    <span class="text-secondary small ms-2">(Showing first {{ overview.merchants.preview|length }} of {{ overview.merchants.count }} merchants from {{ overview.merchants.filename }})</span>
+                                </div>
+                                <a href="{{ url_for('kyc_inspection') }}" class="btn btn-sm btn-outline-info">
+                                    <i class="bi bi-person-check me-1"></i> Open KYC Inspection
+                                </a>
+                            </div>
+
+                            {% if overview.merchants.preview %}
+                            <div class="table-responsive rounded-3" style="border: 1px solid rgba(255, 255, 255, 0.08);">
+                                <table class="table table-dark table-hover table-sm mb-0 align-middle">
+                                    <thead style="background: rgba(30, 41, 59, 0.8);">
+                                        <tr>
+                                            <th class="ps-3 py-2 text-secondary small">#</th>
+                                            <th class="py-2 text-secondary small">Merchant ID</th>
+                                            <th class="py-2 text-secondary small">Merchant Name</th>
+                                            <th class="py-2 text-secondary small">Business Type</th>
+                                            <th class="py-2 text-secondary small">Owner Name</th>
+                                            <th class="py-2 text-secondary small">Registration Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for row in overview.merchants.preview %}
+                                        <tr>
+                                            <td class="ps-3 text-secondary small">{{ loop.index }}</td>
+                                            <td><code class="text-info small">{{ row.get('merchant_id') or '-' }}</code></td>
+                                            <td class="fw-bold text-white">{{ row.get('merchant_name') or '-' }}</td>
+                                            <td><span class="badge bg-info-subtle text-info border border-info-subtle">{{ row.get('business_type') or '-' }}</span></td>
+                                            <td class="text-secondary">{{ row.get('owner_name') or '-' }}</td>
+                                            <td class="text-secondary small">{{ row.get('registration_date') or '-' }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
