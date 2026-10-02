@@ -1,46 +1,88 @@
 {
   "str": {
-    "large_transaction": 300000,
-    "structuring_threshold": 100000,
-    "structuring_count": 100,
-    "structuring_total": 6000000,
+    "large_transaction": 50000,
+    "structuring_threshold": 10000,
+    "structuring_count": 3,
+    "structuring_total": 10000,
     "round_amount_min": 5000,
-    "high_freq_count": 60,
+    "high_freq_count": 5,
     "high_freq_hours": 1
   },
   "ttr": {
-    "threshold": 300000
+    "threshold": 10000
   },
   "kyc": {
     "high_risk_types": [
-      "money exchange",
       "casino",
-      "crypto",
-      "pawnshop",
-      "night club",
-      "arms dealer"
+      "crypto"
     ],
     "new_merchant_days": 30
   },
   "columns": {
     "str": {
-      "transaction_date": "Transaction Date",
-      "amount": "Amount",
-      "counterparty": "Counterparty",
-      "merchant_name": "Merchant Name",
-      "phone": "Phone",
-      "customer_party": "Customer Party",
-      "status": "Status"
+      "Transaction Date": "Transaction Date",
+      "Transaction ID": "Transaction ID",
+      "Transaction Amount": "Transaction Amount",
+      "Debitor Name": "Debitor Name",
+      "Customer Party": "Customer Party",
+      "Status": "Status"
     },
     "ttr": {
+      "Transaction Date": "Transaction Date",
+      "Transaction ID": "Transaction ID",
+      "Transaction Amount": "Transaction Amount",
+      "Debitor Name": "Debitor Name",
+      "Receiver Amount": "Receiver Amount",
+      "Status": "Status"
+    },
+    "available": {
+      "Transaction Date": "Transaction Date",
+      "Transaction ID": "Transaction ID",
+      "E2E ID/Refereneces Number": "E2E Id/Refereneces Number",
+      "Clearing System Ref": "Clearing System Ref",
+      "Transaction Type": "Transaction Type",
+      "Customer Party": "Customer Party",
+      "Merchant Party": "Merchant Party",
+      "Debitor Name": "Debitor Name",
+      "Debitor Account": "Debitor Account",
+      "Merchant Type": "Merchant Type",
+      "MCC Codes": "MCC Codes",
+      "Merchant Name": "Merchant Name",
+      "Phone No": "Phone No",
+      "Creditor Name": "Creditor Name",
+      "Merchant No": "Merchant No",
+      "Transaction Amount": "Transaction Amount",
+      "MDR": "MDR",
+      "MDR Ratio RI": "Mdr Ratio Ri",
+      "MDR Ratio OI": "Mdr Ratio Oi",
+      "DPS Fees": "DPS Fees",
+      "DPS Expense": "Dps Expense",
+      "Cashback Expense": "Cashback Expense",
+      "Income": "Income",
+      "Receiver Amount": "Receiver Amount",
+      "Status": "Status",
+      "Original Transaction ID": "Original Transaction ID",
+      "Refund reason code": "Refund Reason Code",
+      "Refund reason": "Refund reason",
       "transaction_date": "Transaction Date",
+      "transaction_id": "Transaction Id",
       "amount": "Amount",
+      "transaction_type": "Transaction Type",
+      "account_id": "Account Id",
       "counterparty": "Counterparty",
+      "debitor_account": "Debitor Account",
       "merchant_name": "Merchant Name",
+      "merchant_type": "Merchant Type",
+      "mcc_code": "Mcc Code",
       "phone": "Phone",
       "customer_party": "Customer Party",
-      "status": "Status"
-    },
-    "available": {}
+      "merchant_party": "Merchant Party",
+      "creditor_name": "Creditor Name",
+      "status": "Status",
+      "receiver_amount": "Receiver Amount",
+      "mdr": "Mdr",
+      "dps_fees": "Dps Fees",
+      "income": "Income"
+    }
   }
 }

@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Risk Management & Transaction Monitoring System",
+  "description": "Comprehensive Risk Management, STR & TTR Monitoring, Blacklist Checking, and Column Visibility Management System.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

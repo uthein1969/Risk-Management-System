@@ -66,7 +66,10 @@
                         {% endif %}
                     </select>
                 </div>
-                <div class="col-auto ms-auto">
+                <div class="col-auto ms-auto d-flex gap-2">
+                    <a href="{{ url_for('settings') }}#columns" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-sliders"></i> Choose Columns
+                    </a>
                     <button class="btn btn-sm btn-outline-success" onclick="exportTableCSV('ttrTable', 'ttr_report')">
                         <i class="bi bi-download"></i> Export CSV
                     </button>
@@ -76,7 +79,7 @@
     </div>
 
     <!-- Results -->
-    <div class="card">
+    <div class="card shadow-sm">
         <div class="card-body table-responsive">
             {% if results %}
             <table class="table table-hover table-sm" id="ttrTable">
@@ -84,24 +87,20 @@
                     <tr>
                         <th>#</th>
                         {% for col, label in visible_cols.items() %}
-                        <th{% if col == 'amount' %} class="text-end"{% endif %}>{{ label }}</th>
+                        <th class="{% if 'amount' in col|lower or 'fee' in col|lower or 'expense' in col|lower or 'income' in col|lower or 'mdr' in col|lower %}text-end{% endif %}">{{ label }}</th>
                         {% endfor %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in results %}
-                    <tr data-type="{{ row.get('transaction_type', '') }}">
+                    <tr data-type="{{ row|get_cell('transaction_type') }}">
                         <td>{{ loop.index }}</td>
                         {% for col, label in visible_cols.items() %}
-                        <td{% if col == 'amount' %} class="text-end fw-bold text-danger"{% endif %}>
-                            {% if col == 'amount' %}
-                                {{ "{:,.0f}".format(row.get(col, 0)) }}
-                            {% elif col == 'transaction_date' %}
-                                {{ row.get(col, '-')[:19] if row.get(col) else '-' }}
-                            {% elif col == 'status' %}
-                                <span class="badge bg-warning text-dark">{{ row.get(col, 'Pending') }}</span>
+                        <td class="{% if 'amount' in col|lower or 'fee' in col|lower or 'expense' in col|lower or 'income' in col|lower or 'mdr' in col|lower %}text-end fw-bold text-danger{% endif %}">
+                            {% if col in ('status', 'Status') %}
+                                <span class="badge bg-warning text-dark">{{ row|get_cell(col)|format_cell(col) }}</span>
                             {% else %}
-                                {{ row.get(col, '-') }}
+                                {{ row|get_cell(col)|format_cell(col) }}
                             {% endif %}
                         </td>
                         {% endfor %}

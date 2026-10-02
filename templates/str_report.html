@@ -94,7 +94,10 @@
                 <div class="col-auto">
                     <input type="text" class="form-control form-control-sm" id="searchInput" placeholder="Search..." onkeyup="filterTable()">
                 </div>
-                <div class="col-auto ms-auto">
+                <div class="col-auto ms-auto d-flex gap-2">
+                    <a href="{{ url_for('settings') }}#columns" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-sliders"></i> Choose Columns
+                    </a>
                     <button class="btn btn-sm btn-outline-success" onclick="exportTableCSV('strTable', 'str_report')">
                         <i class="bi bi-download"></i> Export CSV
                     </button>
@@ -104,7 +107,7 @@
     </div>
 
     <!-- Results Table -->
-    <div class="card">
+    <div class="card shadow-sm">
         <div class="card-body table-responsive">
             {% if results %}
             <table class="table table-hover table-sm" id="strTable">
@@ -114,7 +117,7 @@
                         <th>Severity</th>
                         <th>Rule</th>
                         {% for col, label in visible_cols.items() %}
-                        <th>{{ label }}</th>
+                        <th class="{% if 'amount' in col|lower or 'fee' in col|lower or 'expense' in col|lower or 'income' in col|lower or 'mdr' in col|lower %}text-end{% endif %}">{{ label }}</th>
                         {% endfor %}
                         <th>Details</th>
                     </tr>
@@ -134,14 +137,8 @@
                         </td>
                         <td>{{ row.rule }}</td>
                         {% for col, label in visible_cols.items() %}
-                        <td{% if col == 'amount' %} class="text-end"{% endif %}>
-                            {% if col == 'amount' %}
-                                {{ "{:,.0f}".format(row.get(col, 0)) }}
-                            {% elif col == 'transaction_date' or col == 'date' %}
-                                {{ (row.get(col, '') or row.get('date', ''))[:19] }}
-                            {% else %}
-                                {{ row.get(col, '-') }}
-                            {% endif %}
+                        <td class="{% if 'amount' in col|lower or 'fee' in col|lower or 'expense' in col|lower or 'income' in col|lower or 'mdr' in col|lower %}text-end fw-semibold{% endif %}">
+                            {{ row|get_cell(col)|format_cell(col) }}
                         </td>
                         {% endfor %}
                         <td class="small">{{ row.details }}</td>

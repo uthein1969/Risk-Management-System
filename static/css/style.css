@@ -272,6 +272,136 @@ body {
     background: rgba(128,128,128,0.5);
 }
 
+/* ─── Column Visibility Beautiful Dark Theme ─── */
+.column-box-str {
+    background: #0b1120 !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+    border-radius: 8px !important;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.column-box-ttr {
+    background: #140d18 !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    border-radius: 8px !important;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.col-item-str {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    padding: 0.55rem 0.75rem !important;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.col-item-str:hover {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.4);
+    transform: translateX(2px);
+}
+
+.col-item-str.is-checked {
+    background: rgba(245, 158, 11, 0.14) !important;
+    border-color: rgba(245, 158, 11, 0.45) !important;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.12);
+}
+
+.col-item-str .col-title {
+    color: #e2e8f0;
+    font-weight: 500;
+    font-size: 0.88rem;
+    transition: color 0.15s;
+}
+
+.col-item-str.is-checked .col-title {
+    color: #fef08a !important;
+    font-weight: 600;
+}
+
+.col-item-str .col-badge {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fcd34d;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 0.73rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.str-check {
+    border-color: rgba(245, 158, 11, 0.5) !important;
+    cursor: pointer;
+}
+
+.str-check:checked {
+    background-color: #f59e0b !important;
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5) !important;
+}
+
+/* TTR specific styles */
+.col-item-ttr {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    padding: 0.55rem 0.75rem !important;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.col-item-ttr:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.4);
+    transform: translateX(2px);
+}
+
+.col-item-ttr.is-checked {
+    background: rgba(239, 68, 68, 0.14) !important;
+    border-color: rgba(239, 68, 68, 0.45) !important;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.12);
+}
+
+.col-item-ttr .col-title {
+    color: #e2e8f0;
+    font-weight: 500;
+    font-size: 0.88rem;
+    transition: color 0.15s;
+}
+
+.col-item-ttr.is-checked .col-title {
+    color: #fca5a5 !important;
+    font-weight: 600;
+}
+
+.col-item-ttr .col-badge {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 0.73rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.ttr-check {
+    border-color: rgba(239, 68, 68, 0.5) !important;
+    cursor: pointer;
+}
+
+.ttr-check:checked {
+    background-color: #ef4444 !important;
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5) !important;
+}
+
 /* ─── Print ─── */
 @media print {
     .sidebar, .topbar, .sidebar-toggle {

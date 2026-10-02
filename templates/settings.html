@@ -136,61 +136,116 @@
         </div>
 
         <!-- Column Configuration -->
-        <div class="row mt-4">
+        <div class="row mt-4" id="columns">
             <div class="col-12">
-                <div class="card border-success">
-                    <div class="card-header bg-success-subtle">
-                        <h6 class="mb-0"><i class="bi bi-table"></i> Column Visibility - Choose which columns to show in reports</h6>
+                <div class="card border-success shadow-sm">
+                    <div class="card-header bg-success-subtle d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <h6 class="mb-0 fw-bold text-success-emphasis"><i class="bi bi-table"></i> Column Visibility - Choose which columns to show in reports</h6>
+                            {% if current_file %}
+                            <span class="badge bg-success text-white">
+                                <i class="bi bi-file-earmark-excel"></i> {{ current_file }} ({{ total_cols }} columns)
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div style="min-width: 250px;">
+                            <input type="text" class="form-control form-control-sm" id="columnSearch" placeholder="🔍 Search columns..." onkeyup="filterColumnList()">
+                        </div>
                     </div>
                     <div class="card-body">
-                        <div class="row">
+                        <div class="alert border d-flex align-items-center gap-2 py-2 mb-3" style="background: rgba(13, 110, 253, 0.08); border-color: rgba(13, 110, 253, 0.25) !important; color: #93c5fd;">
+                            <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+                            <div class="small">
+                                <strong class="text-white">Excel Columns Visibility:</strong>
+                                တင်လိုက်သော Excel File တွင် ပါရှိသော Columns များကို STR Report နှင့် TTR Report တို့တွင် စိတ်ကြိုက် ပြသရန် အောက်ပါ Checkbox များကို Check / Uncheck ပြုလုပ်နိုင်ပါသည်။
+                            </div>
+                        </div>
+
+                        <div class="row g-4">
                             <!-- STR Columns -->
                             <div class="col-md-6">
-                                <h6 class="text-warning"><i class="bi bi-exclamation-triangle"></i> STR Report Columns</h6>
-                                <p class="text-muted small mb-2">Check columns to display in STR report table</p>
-                                <div class="border rounded p-3" style="max-height:300px;overflow-y:auto">
-                                    {% if available_cols %}
-                                        {% for col, label in available_cols.items() %}
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="str_columns" value="{{ col }}"
-                                                id="str_col_{{ col }}"
-                                                {% if col in config.columns.get('str', {}) %}checked{% endif %}>
-                                            <label class="form-check-label small" for="str_col_{{ col }}">
-                                                {{ label }} <code class="small">({{ col }})</code>
-                                            </label>
+                                <div class="p-3 border rounded-3 h-100" style="background: #101524; border-color: rgba(245, 158, 11, 0.25) !important;">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                        <h6 class="text-warning mb-0 fw-bold d-flex align-items-center gap-2">
+                                            <i class="bi bi-exclamation-triangle-fill text-warning"></i> STR Report Columns
+                                            <span class="badge bg-warning text-dark px-2 py-1 fw-bold" id="strBadgeCount">0</span>
+                                        </h6>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="toggleAllColumns('str', true)">Select All</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm text-light" onclick="toggleAllColumns('str', false)">Deselect All</button>
+                                            <button type="button" class="btn btn-warning text-dark fw-bold btn-sm shadow-sm" onclick="setRecommendedColumns('str')">Recommended</button>
                                         </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <p class="text-muted small mb-0">Upload data first to see available columns</p>
-                                    {% endif %}
+                                    </div>
+                                    <p class="text-secondary small mb-3">Check columns to display in Suspicious Transaction Report table</p>
+
+                                    <div class="column-box-str p-2 column-scroll-box" style="max-height: 380px; overflow-y: auto;">
+                                        {% if available_cols %}
+                                            {% for col, label in available_cols.items() %}
+                                            <div class="form-check col-item col-item-str {% if col in config.columns.get('str', {}) %}is-checked{% endif %}" data-name="{{ col | lower }} {{ label | lower }}" onclick="handleRowClick(event, 'str_col_{{ loop.index }}')">
+                                                <input class="form-check-input str-check me-2" type="checkbox" name="str_columns" value="{{ col }}"
+                                                    id="str_col_{{ loop.index }}"
+                                                    onchange="updateCounts()"
+                                                    {% if col in config.columns.get('str', {}) %}checked{% endif %}>
+                                                <label class="form-check-label d-flex justify-content-between align-items-center w-100 cursor-pointer user-select-none mb-0" for="str_col_{{ loop.index }}" onclick="event.stopPropagation()">
+                                                    <span class="col-title">{{ label }}</span>
+                                                    <span class="col-badge">{{ col }}</span>
+                                                </label>
+                                            </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <div class="text-center py-4 text-secondary">
+                                                <i class="bi bi-cloud-upload fs-3 d-block mb-1"></i>
+                                                <p class="small mb-0">Upload Excel data first to see all available columns</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
+
                             <!-- TTR Columns -->
                             <div class="col-md-6">
-                                <h6 class="text-danger"><i class="bi bi-cash-stack"></i> TTR Report Columns</h6>
-                                <p class="text-muted small mb-2">Check columns to display in TTR report table</p>
-                                <div class="border rounded p-3" style="max-height:300px;overflow-y:auto">
-                                    {% if available_cols %}
-                                        {% for col, label in available_cols.items() %}
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="ttr_columns" value="{{ col }}"
-                                                id="ttr_col_{{ col }}"
-                                                {% if col in config.columns.get('ttr', {}) %}checked{% endif %}>
-                                            <label class="form-check-label small" for="ttr_col_{{ col }}">
-                                                {{ label }} <code class="small">({{ col }})</code>
-                                            </label>
+                                <div class="p-3 border rounded-3 h-100" style="background: #18111e; border-color: rgba(239, 68, 68, 0.25) !important;">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                        <h6 class="text-danger mb-0 fw-bold d-flex align-items-center gap-2">
+                                            <i class="bi bi-cash-stack text-danger"></i> TTR Report Columns
+                                            <span class="badge bg-danger text-white px-2 py-1 fw-bold" id="ttrBadgeCount">0</span>
+                                        </h6>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="toggleAllColumns('ttr', true)">Select All</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm text-light" onclick="toggleAllColumns('ttr', false)">Deselect All</button>
+                                            <button type="button" class="btn btn-danger text-white fw-bold btn-sm shadow-sm" onclick="setRecommendedColumns('ttr')">Recommended</button>
                                         </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <p class="text-muted small mb-0">Upload data first to see available columns</p>
-                                    {% endif %}
+                                    </div>
+                                    <p class="text-secondary small mb-3">Check columns to display in Threshold Transaction Report table</p>
+
+                                    <div class="column-box-ttr p-2 column-scroll-box" style="max-height: 380px; overflow-y: auto;">
+                                        {% if available_cols %}
+                                            {% for col, label in available_cols.items() %}
+                                            <div class="form-check col-item col-item-ttr {% if col in config.columns.get('ttr', {}) %}is-checked{% endif %}" data-name="{{ col | lower }} {{ label | lower }}" onclick="handleRowClick(event, 'ttr_col_{{ loop.index }}')">
+                                                <input class="form-check-input ttr-check me-2" type="checkbox" name="ttr_columns" value="{{ col }}"
+                                                    id="ttr_col_{{ loop.index }}"
+                                                    onchange="updateCounts()"
+                                                    {% if col in config.columns.get('ttr', {}) %}checked{% endif %}>
+                                                <label class="form-check-label d-flex justify-content-between align-items-center w-100 cursor-pointer user-select-none mb-0" for="ttr_col_{{ loop.index }}" onclick="event.stopPropagation()">
+                                                    <span class="col-title">{{ label }}</span>
+                                                    <span class="col-badge">{{ col }}</span>
+                                                </label>
+                                            </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <div class="text-center py-4 text-secondary">
+                                                <i class="bi bi-cloud-upload fs-3 d-block mb-1"></i>
+                                                <p class="small mb-0">Upload Excel data first to see all available columns</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="alert alert-info small mt-3 mb-0">
-                            <i class="bi bi-info-circle"></i>
-                            <strong>Tip:</strong> First upload your data file, then come back here to choose which columns to show.
-                            The analysis columns (Rule, Severity, Details) are always shown automatically.
+
+                        <div class="alert small mt-3 mb-0" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: #94a3b8;">
+                            <i class="bi bi-check2-circle text-success me-1"></i>
+                            <strong>Note:</strong> Rule analysis columns (e.g. <em class="text-warning">Severity</em>, <em class="text-warning">Rule</em>, <em class="text-warning">Details</em> in STR) are always displayed automatically alongside your chosen Excel columns.
                         </div>
                     </div>
                 </div>
@@ -200,14 +255,17 @@
         <!-- Save Button -->
         <div class="row mt-4">
             <div class="col-12">
-                <div class="card">
-                    <div class="card-body d-flex justify-content-between align-items-center">
+                <div class="card shadow-sm">
+                    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
                         <div>
-                            <span class="text-muted">Changes take effect immediately on next analysis.</span>
+                            <span class="fw-semibold text-dark"><i class="bi bi-arrow-repeat text-primary"></i> Changes take effect immediately</span>
+                            <span class="text-muted small d-block">Report tables and CSV exports will reflect the columns selected above.</span>
                         </div>
                         <div class="d-flex gap-2">
-                            <a href="{{ url_for('settings') }}" class="btn btn-outline-secondary">Reset</a>
-                            <button type="submit" class="btn btn-primary btn-lg">
+                            <a href="{{ url_for('settings') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-counterclockwise"></i> Reset
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg px-4">
                                 <i class="bi bi-save"></i> Save Configuration
                             </button>
                         </div>
@@ -256,4 +314,89 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function handleRowClick(e, cbId) {
+    if (e.target.tagName && e.target.tagName.toLowerCase() === 'input') return;
+    const cb = document.getElementById(cbId);
+    if (cb) {
+        cb.checked = !cb.checked;
+        updateCounts();
+    }
+}
+
+function updateCounts() {
+    const strChecked = document.querySelectorAll('.str-check:checked').length;
+    const strTotal = document.querySelectorAll('.str-check').length;
+    const ttrChecked = document.querySelectorAll('.ttr-check:checked').length;
+    const ttrTotal = document.querySelectorAll('.ttr-check').length;
+
+    const strBadge = document.getElementById('strBadgeCount');
+    if (strBadge) strBadge.textContent = `${strChecked} / ${strTotal}`;
+
+    const ttrBadge = document.getElementById('ttrBadgeCount');
+    if (ttrBadge) ttrBadge.textContent = `${ttrChecked} / ${ttrTotal}`;
+
+    document.querySelectorAll('.str-check').forEach(cb => {
+        const item = cb.closest('.col-item');
+        if (item) {
+            if (cb.checked) item.classList.add('is-checked');
+            else item.classList.remove('is-checked');
+        }
+    });
+
+    document.querySelectorAll('.ttr-check').forEach(cb => {
+        const item = cb.closest('.col-item');
+        if (item) {
+            if (cb.checked) item.classList.add('is-checked');
+            else item.classList.remove('is-checked');
+        }
+    });
+}
+
+function toggleAllColumns(type, check) {
+    const selector = type === 'str' ? '.str-check' : '.ttr-check';
+    document.querySelectorAll(selector).forEach(cb => {
+        const parentItem = cb.closest('.col-item');
+        if (!parentItem || parentItem.style.display !== 'none') {
+            cb.checked = check;
+        }
+    });
+    updateCounts();
+}
+
+function setRecommendedColumns(type) {
+    const recommended = [
+        'transaction date', 'transaction_date', 'date',
+        'transaction id', 'transaction_id',
+        'transaction amount', 'amount',
+        'debitor name', 'counterparty',
+        'merchant name', 'merchant_name',
+        'customer party', 'customer_party',
+        'merchant party', 'merchant_party',
+        'phone no', 'phone',
+        'status',
+        'receiver amount', 'receiver_amount'
+    ];
+    const selector = type === 'str' ? '.str-check' : '.ttr-check';
+    document.querySelectorAll(selector).forEach(cb => {
+        const val = (cb.value || '').toLowerCase().trim();
+        const isRec = recommended.some(rec => val === rec || val.includes(rec));
+        cb.checked = isRec;
+    });
+    updateCounts();
+}
+
+function filterColumnList() {
+    const q = (document.getElementById('columnSearch').value || '').toLowerCase().trim();
+    document.querySelectorAll('.col-item').forEach(item => {
+        const text = item.getAttribute('data-name') || '';
+        item.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', updateCounts);
+</script>
 {% endblock %}
