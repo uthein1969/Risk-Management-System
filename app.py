@@ -15,8 +15,47 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = 'risk-management-secret-key-2026'
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'data')
+
+# ─── Serverless & Vercel Storage Compatibility ───
+BUNDLED_DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+
+def get_writable_data_dir():
+    # If running on Vercel, AWS Lambda, or a read-only container
+    is_serverless = os.environ.get('VERCEL') == '1' or os.environ.get('AWS_LAMBDA_FUNCTION_NAME') is not None
+    target = '/tmp/data' if is_serverless else BUNDLED_DATA_DIR
+    try:
+        os.makedirs(target, exist_ok=True)
+        test_file = os.path.join(target, '.write_test')
+        with open(test_file, 'w') as f:
+            f.write('ok')
+        os.remove(test_file)
+        return target
+    except (OSError, IOError, PermissionError):
+        target = '/tmp/data'
+        try:
+            os.makedirs(target, exist_ok=True)
+        except Exception:
+            pass
+        return target
+
+DATA_DIR = get_writable_data_dir()
+app.config['UPLOAD_FOLDER'] = DATA_DIR
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
+
+def sync_bundled_data():
+    """Copy pre-packaged Excel/CSV datasets from read-only image to writable directory."""
+    if DATA_DIR != BUNDLED_DATA_DIR and os.path.exists(BUNDLED_DATA_DIR):
+        import shutil
+        for fn in os.listdir(BUNDLED_DATA_DIR):
+            src = os.path.join(BUNDLED_DATA_DIR, fn)
+            dst = os.path.join(DATA_DIR, fn)
+            if not os.path.exists(dst) and os.path.isfile(src):
+                try:
+                    shutil.copy2(src, dst)
+                except Exception as e:
+                    print(f"Notice: Could not copy {fn} to writable dir: {e}")
+
+sync_bundled_data()
 
 ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
 
@@ -75,7 +114,7 @@ INTERNAL_KEYS = {
 }
 
 # ─── STR/TTR Configuration ───
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'data', 'risk_config.json')
+CONFIG_FILE = os.path.join(DATA_DIR, 'risk_config.json')
 
 DEFAULT_CONFIG = {
     'str': {
@@ -124,28 +163,38 @@ DEFAULT_CONFIG = {
 
 def load_config():
     """Load config from file, fallback to defaults."""
-    try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                saved = json.load(f)
-            config = json.loads(json.dumps(DEFAULT_CONFIG))
-            for section in ['str', 'ttr', 'kyc']:
-                if section in saved and isinstance(saved[section], dict):
-                    config[section].update(saved[section])
-            if 'columns' in saved and isinstance(saved['columns'], dict):
-                for col_sec in ['str', 'ttr', 'available']:
-                    if col_sec in saved['columns']:
-                        config['columns'][col_sec] = saved['columns'][col_sec]
-            return config
-    except Exception as e:
-        print(f"Config load error: {e}")
+    candidates = [CONFIG_FILE, os.path.join(BUNDLED_DATA_DIR, 'risk_config.json')]
+    for cf in candidates:
+        if os.path.exists(cf):
+            try:
+                with open(cf, 'r', encoding='utf-8') as f:
+                    saved = json.load(f)
+                config = json.loads(json.dumps(DEFAULT_CONFIG))
+                for section in ['str', 'ttr', 'kyc']:
+                    if section in saved and isinstance(saved[section], dict):
+                        config[section].update(saved[section])
+                if 'columns' in saved and isinstance(saved['columns'], dict):
+                    for col_sec in ['str', 'ttr', 'available']:
+                        if col_sec in saved['columns']:
+                            config['columns'][col_sec] = saved['columns'][col_sec]
+                return config
+            except Exception as e:
+                print(f"Config load error from {cf}: {e}")
     return json.loads(json.dumps(DEFAULT_CONFIG))
 
 def save_config(config):
-    """Save config to file."""
-    os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
+    """Save config to file with safe fallback for read-only environments."""
+    try:
+        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Notice: Config file not writable ({e}); saving in memory")
+        for k, v in config.items():
+            if isinstance(v, dict) and k in DEFAULT_CONFIG and isinstance(DEFAULT_CONFIG[k], dict):
+                DEFAULT_CONFIG[k].update(v)
+            else:
+                DEFAULT_CONFIG[k] = v
 
 
 def allowed_file(filename):
@@ -508,45 +557,53 @@ def detect_str(data, config=None):
                 r.update({'rule': 'High Frequency', 'severity': 'HIGH', 'amount': safe_float(txn.get('amount', 0)), 'date': str(txn.get('transaction_date', ''))[:19], 'details': f'{count} txns in {freq_hours}h (limit {freq_count})'})
                 results.append(r)
 
-    # Rule 5: 1-Hour Counterparty Transfer Frequency (Hourly Window by Counterparty & Merchant)
-    hourly_cp_map = {}
+    # Rule 5: Debitor Payment Frequency (Configurable Window)
+    freq_hours_window = cfg.get('debitor_freq_hours', 1)
+    debitor_map = {}
     for row in data:
         dt = safe_date(row.get('Transaction Date') or row.get('transaction_date'))
         if not dt:
             continue
-        h_start = dt.replace(minute=0, second=0)
-        h_end = h_start + timedelta(hours=1)
-        slot_label = f"{h_start.strftime('%I:%M %p')} - {h_end.strftime('%I:%M %p')}"
-        slot_key = f"{dt.strftime('%Y-%m-%d')} ({slot_label})"
         merch = row.get('Merchant Name') or row.get('Creditor Name') or row.get('merchant_name') or 'Unknown Merchant'
-        cp = row.get('Debitor Name') or row.get('Customer Party') or row.get('counterparty') or 'Unknown Counterparty'
-        k = (merch, slot_key, cp)
-        if k not in hourly_cp_map:
-            hourly_cp_map[k] = []
-        hourly_cp_map[k].append(row)
+        deb = row.get('Debitor Name') or row.get('Customer Party') or row.get('counterparty') or 'Unknown Debitor'
+        k = (merch, deb)
+        if k not in debitor_map:
+            debitor_map[k] = []
+        debitor_map[k].append((dt, row))
 
-    for (merch, slot_key, cp), row_list in hourly_cp_map.items():
-        if len(row_list) >= 2:
-            cnt = len(row_list)
-            tot = sum(safe_float(r.get('Transaction Amount') or r.get('amount', 0)) for r in row_list)
-            sev = 'HIGH' if cnt >= 4 or tot >= 100000 else 'MEDIUM'
-            group_id = f"grp_{abs(hash((merch, slot_key, cp))) % 100000}"
-            for r in row_list:
-                res = dict(r)
-                res.update({
-                    'rule': '1-Hour Counterparty Frequency',
-                    'severity': sev,
-                    'amount': safe_float(r.get('Transaction Amount') or r.get('amount', 0)),
-                    'date': str(r.get('Transaction Date') or r.get('transaction_date', ''))[:19],
-                    'details': f'Counterparty "{cp}" made {cnt} transfer payments ({tot:,.0f} MMK) to "{merch}" within 1 hour: {slot_key}',
-                    'hourly_group_id': group_id,
-                    'frequency_count': cnt,
-                    'group_total_amount': tot,
-                    'group_merchant': merch,
-                    'group_counterparty': cp,
-                    'group_slot': slot_key
-                })
-                results.append(res)
+    for (merch, deb), dt_rows in debitor_map.items():
+        dt_rows.sort(key=lambda x: x[0])
+        n = len(dt_rows)
+        if n >= 2:
+            matched_idx = set()
+            for i in range(n):
+                window = [j for j in range(n) if 0 <= (dt_rows[j][0] - dt_rows[i][0]).total_seconds() <= freq_hours_window * 3600]
+                if len(window) >= 2:
+                    for j in window:
+                        matched_idx.add(j)
+            if matched_idx:
+                matched_rows = [dt_rows[i][1] for i in sorted(matched_idx)]
+                cnt = len(matched_rows)
+                tot = sum(safe_float(r.get('Transaction Amount') or r.get('amount', 0)) for r in matched_rows)
+                sev = 'HIGH' if cnt >= 4 or tot >= 100000 else 'MEDIUM'
+                group_id = f"deb_grp_{abs(hash((merch, deb))) % 100000}"
+                for r in matched_rows:
+                    res = dict(r)
+                    res.update({
+                        'rule': f'Debitor Frequency ({freq_hours_window}h)',
+                        'severity': sev,
+                        'amount': safe_float(r.get('Transaction Amount') or r.get('amount', 0)),
+                        'date': str(r.get('Transaction Date') or r.get('transaction_date', ''))[:19],
+                        'details': f'Debitor "{deb}" made {cnt} payments ({tot:,.0f} MMK) to "{merch}" within {freq_hours_window} hour(s)',
+                        'hourly_group_id': group_id,
+                        'debitor_group_id': group_id,
+                        'frequency_count': cnt,
+                        'group_total_amount': tot,
+                        'group_merchant': merch,
+                        'group_counterparty': deb,
+                        'group_debitor': deb
+                    })
+                    results.append(res)
 
     # Deduplicate
     seen = set()
@@ -778,177 +835,256 @@ def format_cell_value(val, col=''):
     return str(val)
 
 
-def analyze_hourly_counterparty_frequency(data, min_count=2):
+def parse_time_minutes(s):
+    if not s:
+        return None
+    s_clean = str(s).strip().lower().replace('pm', '').replace('am', '').strip()
+    if s_clean in ('all', '', 'none'):
+        return None
+    try:
+        parts = s_clean.split(':')
+        h = int(parts[0])
+        m = int(parts[1]) if len(parts) > 1 else 0
+        if h == 24 and m == 0:
+            return 24 * 60
+        return h * 60 + m
+    except Exception:
+        return None
+
+
+def format_time_display(val_str):
+    m = parse_time_minutes(val_str)
+    if m is None:
+        return val_str
+    h = m // 60
+    mins = m % 60
+    if h == 24 and mins == 0:
+        return "24:00 (12:00 AM Midnight)"
+    period = "AM" if h < 12 else "PM"
+    disp_h = h % 12
+    if disp_h == 0:
+        disp_h = 12
+    return f"{h:02d}:{mins:02d} ({disp_h:02d}:{mins:02d} {period})"
+
+
+def analyze_debitor_frequency(data, from_time=None, to_time=None, hours_val='all', min_count=1):
     """
-    Group transactions by Merchant -> 1-Hour Time Window -> Counterparty.
-    Counts payment frequency within each 1-hour interval.
-    (Sample from 9:00 AM to 10:00 AM by counterparty grouped under merchant).
+    Group transactions by Merchant -> Debitor Name -> Transactions.
+    Supports:
+      1) Custom From Time to To Time (e.g. from 21:00 to 24:00, or any HH:MM to HH:MM)
+      2) Duration / sliding window hours ('all' or 1..24)
+      3) Min payment count (1+ or 2+)
+    Under each Merchant Name, displays each Debitor Name that made payment(s),
+    and under each Debitor Name, lists their individual transactions within the selected time range.
     """
     if not data:
         return {
             'merchants': [],
             'summary': {
-                'total_merchants': 0, 'total_groups': 0, 'total_txns': 0,
-                'total_amount': 0, 'max_count': 0, 'peak_counterparty': '-',
-                'peak_merchant': '-'
+                'total_merchants': 0, 'total_debitors': 0, 'total_groups': 0, 'total_txns': 0,
+                'total_amount': 0, 'max_count': 0, 'peak_counterparty': '-', 'peak_debitor': '-',
+                'peak_merchant': '-', 'from_time': from_time or '00:00', 'to_time': to_time or '24:00',
+                'time_range_label': 'All Day (00:00 - 24:00)',
+                'hours_selected': hours_val, 'min_count': min_count
             },
-            'available_hour_labels': []
+            'available_hours': ['all'] + list(range(1, 25)),
+            'from_time': from_time or '00:00',
+            'to_time': to_time or '24:00',
+            'hours_selected': hours_val,
+            'min_freq': min_count
         }
 
+    # Normalize from_time & to_time
+    from_time_clean = str(from_time).strip() if from_time else '00:00'
+    to_time_clean = str(to_time).strip() if to_time else '24:00'
+
+    f_min = parse_time_minutes(from_time_clean)
+    t_min = parse_time_minutes(to_time_clean)
+
+    # Normalize hours_val
+    hours_str = str(hours_val).strip().lower()
+    if hours_str == 'all':
+        hours_mode = 'all'
+        window_seconds = None
+    else:
+        try:
+            h_int = int(hours_str)
+            if 1 <= h_int <= 24:
+                hours_mode = h_int
+                window_seconds = h_int * 3600
+            else:
+                hours_mode = 'all'
+                window_seconds = None
+        except ValueError:
+            hours_mode = 'all'
+            window_seconds = None
+
     from collections import defaultdict
-    merch_tree = defaultdict(lambda: {
+    merch_map = defaultdict(lambda: {
         'merchant_name': '',
         'merchant_no': '',
         'merchant_party': '',
-        'slots': defaultdict(lambda: {
-            'slot_key': '',
-            'date_str': '',
-            'hour_label': '',
-            'counterparties': defaultdict(lambda: {
-                'counterparty_name': '',
-                'debitor_account': '',
-                'customer_party': '',
-                'phone_no': '',
-                'transactions': []
-            })
-        })
+        'debitors': defaultdict(list)
     })
 
     for t in data:
-        d_val = t.get('Transaction Date') or t.get('transaction_date')
-        dt = safe_date(d_val)
+        dt = safe_date(t.get('Transaction Date') or t.get('transaction_date'))
         if not dt:
             continue
-        h_start = dt.replace(minute=0, second=0)
-        h_end = h_start + timedelta(hours=1)
-        slot_key = f"{dt.strftime('%Y-%m-%d')} {h_start.strftime('%H:00')} - {h_end.strftime('%H:00')}"
-        hour_label = f"{h_start.strftime('%I:%M %p')} - {h_end.strftime('%I:%M %p')}"
-        date_str = dt.strftime('%Y-%m-%d')
 
-        merch = t.get('Merchant Name') or t.get('Creditor Name') or t.get('merchant_name') or 'Unknown Merchant'
-        cp = t.get('Debitor Name') or t.get('Customer Party') or t.get('counterparty') or 'Unknown Counterparty'
+        # Time-of-day filter (From Time to To Time)
+        if f_min is not None and t_min is not None:
+            cur_min = dt.hour * 60 + dt.minute + dt.second / 60.0
+            if f_min <= t_min:
+                if not (f_min <= cur_min <= t_min):
+                    continue
+            else:  # Crossing midnight (e.g. 22:00 to 04:00)
+                if not (cur_min >= f_min or cur_min <= t_min):
+                    continue
 
-        m_entry = merch_tree[merch]
-        m_entry['merchant_name'] = merch
-        m_entry['merchant_no'] = t.get('Merchant No') or t.get('account_id') or ''
-        m_entry['merchant_party'] = t.get('Merchant Party') or ''
+        m = t.get('Merchant Name') or t.get('Creditor Name') or t.get('merchant_name') or 'Unknown Merchant'
+        d = t.get('Debitor Name') or t.get('Customer Party') or t.get('counterparty') or 'Unknown Debitor'
 
-        s_entry = m_entry['slots'][slot_key]
-        s_entry['slot_key'] = slot_key
-        s_entry['date_str'] = date_str
-        s_entry['hour_label'] = hour_label
+        m_entry = merch_map[m]
+        m_entry['merchant_name'] = m
+        if not m_entry['merchant_no']:
+            m_entry['merchant_no'] = t.get('Merchant No') or t.get('account_id') or ''
+        if not m_entry['merchant_party']:
+            m_entry['merchant_party'] = t.get('Merchant Party') or ''
 
-        cp_entry = s_entry['counterparties'][cp]
-        cp_entry['counterparty_name'] = cp
-        cp_entry['debitor_account'] = t.get('Debitor Account') or t.get('debitor_account') or ''
-        cp_entry['customer_party'] = t.get('Customer Party') or t.get('customer_party') or ''
-        cp_entry['phone_no'] = t.get('Phone No') or t.get('phone') or ''
-        cp_entry['transactions'].append(t)
+        m_entry['debitors'][d].append((dt, t))
 
-    final_merchants = []
-    total_groups = 0
+    merchants_list = []
+    total_debitors = 0
     total_txns = 0
     total_amount = 0
     max_count = 0
-    peak_cp = '-'
+    peak_deb = '-'
     peak_merch = '-'
     group_counter = 0
 
-    all_slots_set = set()
+    for m, m_data in sorted(merch_map.items()):
+        deb_list = []
+        merch_txns_count = 0
+        merch_amount = 0
 
-    for merch, m_data in sorted(merch_tree.items()):
-        valid_slots = []
-        merch_txn_count = 0
-        merch_total_amount = 0
+        for d, dt_txns in sorted(m_data['debitors'].items()):
+            dt_txns.sort(key=lambda x: x[0])
+            n = len(dt_txns)
+            selected_txns = []
 
-        for slot_key, s_data in sorted(m_data['slots'].items()):
-            valid_cps = []
-            for cp, cp_data in sorted(s_data['counterparties'].items()):
-                cnt = len(cp_data['transactions'])
-                if cnt >= min_count:
-                    group_counter += 1
-                    tot = sum(safe_float(x.get('Transaction Amount') or x.get('amount', 0)) for x in cp_data['transactions'])
-                    group_id = f"grp_{group_counter}"
-                    all_slots_set.add(s_data['hour_label'])
+            if hours_mode == 'all':
+                if n >= min_count:
+                    selected_txns = [x[1] for x in dt_txns]
+                    valid_dts = [x[0] for x in dt_txns]
+            else:
+                # Find all transactions that fall into any cluster of <= window_seconds with >= min_count txns
+                matched_idx = set()
+                for i in range(n):
+                    window = [j for j in range(n) if 0 <= (dt_txns[j][0] - dt_txns[i][0]).total_seconds() <= window_seconds]
+                    if len(window) >= min_count:
+                        for j in window:
+                            matched_idx.add(j)
+                if matched_idx:
+                    matched_items = [dt_txns[i] for i in sorted(matched_idx)]
+                    selected_txns = [x[1] for x in matched_items]
+                    valid_dts = [x[0] for x in matched_items]
 
-                    sorted_txns = sorted(
-                        cp_data['transactions'],
-                        key=lambda x: str(safe_date(x.get('Transaction Date') or x.get('transaction_date')) or '')
-                    )
+            if selected_txns:
+                group_counter += 1
+                cnt = len(selected_txns)
+                tot_amt = sum(safe_float(x.get('Transaction Amount') or x.get('amount', 0)) for x in selected_txns)
+                group_id = f"deb_grp_{group_counter}"
+                first_dt = valid_dts[0].strftime('%Y-%m-%d %H:%M:%S')
+                last_dt = valid_dts[-1].strftime('%Y-%m-%d %H:%M:%S')
+                span_diff = valid_dts[-1] - valid_dts[0]
+                hours_span = span_diff.total_seconds() / 3600.0
 
-                    d_times = [safe_date(x.get('Transaction Date') or x.get('transaction_date')) for x in sorted_txns]
-                    valid_d_times = [d for d in d_times if d]
-                    min_time_str = valid_d_times[0].strftime('%H:%M:%S') if valid_d_times else ''
-                    max_time_str = valid_d_times[-1].strftime('%H:%M:%S') if valid_d_times else ''
+                sample = selected_txns[0]
+                debitor_info = {
+                    'group_id': group_id,
+                    'counterparty_name': d,
+                    'debitor_name': d,
+                    'debitor_account': sample.get('Debitor Account') or sample.get('debitor_account') or '',
+                    'customer_party': sample.get('Customer Party') or sample.get('customer_party') or '',
+                    'phone_no': sample.get('Phone No') or sample.get('phone') or '',
+                    'merchant_name': m,
+                    'merchant_no': m_data['merchant_no'],
+                    'merchant_party': m_data['merchant_party'],
+                    'count': cnt,
+                    'total_amount': tot_amt,
+                    'avg_amount': tot_amt / cnt if cnt else 0,
+                    'first_time': first_dt,
+                    'last_time': last_dt,
+                    'min_time': valid_dts[0].strftime('%H:%M:%S'),
+                    'max_time': valid_dts[-1].strftime('%H:%M:%S'),
+                    'hours_span': round(hours_span, 1),
+                    'severity': 'HIGH' if cnt >= 4 or tot_amt >= 100000 else 'MEDIUM',
+                    'transactions': selected_txns
+                }
+                deb_list.append(debitor_info)
+                merch_txns_count += cnt
+                merch_amount += tot_amt
+                total_debitors += 1
+                total_txns += cnt
+                total_amount += tot_amt
 
-                    group_dict = {
-                        'group_id': group_id,
-                        'counterparty_name': cp_data['counterparty_name'],
-                        'debitor_account': cp_data['debitor_account'],
-                        'customer_party': cp_data['customer_party'],
-                        'phone_no': cp_data['phone_no'],
-                        'merchant_name': merch,
-                        'merchant_no': m_data['merchant_no'],
-                        'merchant_party': m_data['merchant_party'],
-                        'slot_key': slot_key,
-                        'hour_label': s_data['hour_label'],
-                        'date_str': s_data['date_str'],
-                        'count': cnt,
-                        'total_amount': tot,
-                        'avg_amount': tot / cnt if cnt else 0,
-                        'min_time': min_time_str,
-                        'max_time': max_time_str,
-                        'severity': 'HIGH' if cnt >= 4 or tot >= 100000 else 'MEDIUM',
-                        'transactions': sorted_txns
-                    }
-                    valid_cps.append(group_dict)
-                    total_groups += 1
-                    total_txns += cnt
-                    total_amount += tot
-                    merch_txn_count += cnt
-                    merch_total_amount += tot
-                    if cnt > max_count:
-                        max_count = cnt
-                        peak_cp = cp_data['counterparty_name']
-                        peak_merch = merch
+                if cnt > max_count:
+                    max_count = cnt
+                    peak_deb = d
+                    peak_merch = m
 
-            if valid_cps:
-                valid_cps.sort(key=lambda x: x['count'], reverse=True)
-                valid_slots.append({
-                    'slot_key': slot_key,
-                    'date_str': s_data['date_str'],
-                    'hour_label': s_data['hour_label'],
-                    'counterparty_groups': valid_cps,
-                    'slot_group_count': len(valid_cps)
-                })
-
-        if valid_slots:
-            valid_slots.sort(key=lambda x: x['slot_key'], reverse=True)
-            final_merchants.append({
-                'merchant_name': m_data['merchant_name'],
+        if deb_list:
+            deb_list.sort(key=lambda x: x['count'], reverse=True)
+            merchants_list.append({
+                'merchant_name': m,
                 'merchant_no': m_data['merchant_no'],
                 'merchant_party': m_data['merchant_party'],
-                'slots': valid_slots,
-                'total_groups': sum(len(s['counterparty_groups']) for s in valid_slots),
-                'total_txns': merch_txn_count,
-                'total_amount': merch_total_amount,
+                'debitors': deb_list,
+                'debitor_count': len(deb_list),
+                'total_groups': len(deb_list),
+                'total_txns': merch_txns_count,
+                'total_amount': merch_amount
             })
 
-    final_merchants.sort(key=lambda x: x['total_txns'], reverse=True)
+    merchants_list.sort(key=lambda x: x['total_txns'], reverse=True)
+
+    # Time range label
+    if (from_time_clean == '00:00' and to_time_clean in ('24:00', '23:59')) or (f_min is None and t_min is None):
+        range_label = "All Day (00:00 - 24:00)"
+    else:
+        range_label = f"From {from_time_clean} to {to_time_clean}"
 
     return {
-        'merchants': final_merchants,
+        'merchants': merchants_list,
         'summary': {
-            'total_merchants': len(final_merchants),
-            'total_groups': total_groups,
+            'total_merchants': len(merchants_list),
+            'total_debitors': total_debitors,
+            'total_groups': total_debitors,
             'total_txns': total_txns,
             'total_amount': total_amount,
             'max_count': max_count,
-            'peak_counterparty': peak_cp,
+            'peak_counterparty': peak_deb,
+            'peak_debitor': peak_deb,
             'peak_merchant': peak_merch,
+            'from_time': from_time_clean,
+            'to_time': to_time_clean,
+            'time_range_label': range_label,
+            'hours_selected': hours_mode,
+            'min_count': min_count
         },
-        'available_hour_labels': sorted(list(all_slots_set))
+        'from_time': from_time_clean,
+        'to_time': to_time_clean,
+        'time_range_label': range_label,
+        'hours_selected': hours_mode,
+        'min_freq': min_count,
+        'available_hours': ['all'] + list(range(1, 25))
     }
+
+
+def analyze_hourly_counterparty_frequency(data, min_count=2):
+    """Backward compatibility wrapper for hourly counterparty frequency."""
+    return analyze_debitor_frequency(data, hours_val=1, min_count=min_count)
 
 
 META_FILE = os.path.join(app.config['UPLOAD_FOLDER'], 'data_store_meta.json')
@@ -978,32 +1114,47 @@ def load_meta():
     return {}
 
 
+def resolve_file_path(upload_folder, fn):
+    if not fn:
+        return None
+    for folder in [upload_folder, BUNDLED_DATA_DIR]:
+        if os.path.exists(folder):
+            p = os.path.join(folder, fn)
+            if os.path.exists(p):
+                return p
+    return None
+
+
 def init_sample_data():
     """Auto-load existing sample/uploaded data files if present in data/."""
     upload_folder = app.config['UPLOAD_FOLDER']
-    os.makedirs(upload_folder, exist_ok=True)
+    try:
+        os.makedirs(upload_folder, exist_ok=True)
+    except Exception:
+        pass
     meta = load_meta()
     meta_files = meta.get('file_names', {})
 
-    # 1. Transactions: Check meta first, or find newest Excel/CSV in data/
+    # 1. Transactions: Check meta first, or find newest Excel/CSV in data directories
     txn_fn = meta_files.get('transactions')
-    if not txn_fn or not os.path.exists(os.path.join(upload_folder, txn_fn)):
-        # Prefer specific candidates or most recently modified transaction file
+    if not txn_fn or not resolve_file_path(upload_folder, txn_fn):
         candidates = []
-        for f in os.listdir(upload_folder):
-            if f.endswith(('.xlsx', '.xls', '.csv')):
-                f_lower = f.lower()
-                if not any(x in f_lower for x in ['blacklist', 'sample_merch', 'file_179']):
-                    fp = os.path.join(upload_folder, f)
-                    candidates.append((os.path.getmtime(fp), f))
+        for folder in [upload_folder, BUNDLED_DATA_DIR]:
+            if os.path.exists(folder):
+                for f in os.listdir(folder):
+                    if f.endswith(('.xlsx', '.xls', '.csv')):
+                        f_lower = f.lower()
+                        if not any(x in f_lower for x in ['blacklist', 'sample_merch', 'file_179']):
+                            fp = os.path.join(folder, f)
+                            candidates.append((os.path.getmtime(fp), f))
         candidates.sort(reverse=True)
         if candidates:
             txn_fn = candidates[0][1]
         else:
             txn_fn = 'MMQR_Merchant_Transactions_01102026.xlsx'
 
-    txn_fp = os.path.join(upload_folder, txn_fn)
-    if os.path.exists(txn_fp):
+    txn_fp = resolve_file_path(upload_folder, txn_fn)
+    if txn_fp and os.path.exists(txn_fp):
         rows, headers = load_file(txn_fp)
         if rows:
             data_store['transactions'] = rows
@@ -1019,8 +1170,8 @@ def init_sample_data():
 
     # 2. Merchants:
     merch_fn = meta_files.get('merchants') or 'sample_merchants.csv'
-    merch_fp = os.path.join(upload_folder, merch_fn)
-    if os.path.exists(merch_fp):
+    merch_fp = resolve_file_path(upload_folder, merch_fn)
+    if merch_fp and os.path.exists(merch_fp):
         rows, _ = load_file(merch_fp)
         if rows:
             data_store['merchants'] = rows
@@ -1028,20 +1179,30 @@ def init_sample_data():
 
     # 3. Blacklist:
     bl_fn = meta_files.get('blacklist')
-    if not bl_fn or not os.path.exists(os.path.join(upload_folder, bl_fn)):
-        # Check if user uploaded file_1790843907255.xlsx exists
-        if os.path.exists(os.path.join(upload_folder, 'file_1790843907255.xlsx')):
+    if not bl_fn or not resolve_file_path(upload_folder, bl_fn):
+        if resolve_file_path(upload_folder, 'file_1790843907255.xlsx'):
             bl_fn = 'file_1790843907255.xlsx'
         else:
             bl_fn = 'sample_blacklist.csv'
-    bl_fp = os.path.join(upload_folder, bl_fn)
-    if os.path.exists(bl_fp):
+    bl_fp = resolve_file_path(upload_folder, bl_fn)
+    if bl_fp and os.path.exists(bl_fp):
         rows, _ = load_file(bl_fp)
         if rows:
             data_store['blacklist'] = normalize_blacklist_rows(rows)
             data_store['file_names']['blacklist'] = bl_fn
 
     save_meta()
+
+
+_data_initialized = False
+
+@app.before_request
+def ensure_sample_data_initialized():
+    global _data_initialized
+    if not _data_initialized:
+        sync_bundled_data()
+        init_sample_data()
+        _data_initialized = True
 
 
 # ─── Routes ───
@@ -1159,9 +1320,30 @@ def upload():
 @app.route('/str')
 def str_report():
     config = load_config()
-    min_freq = request.args.get('min_freq', 2, type=int)
+    from_time = request.args.get('from_time', '00:00').strip()
+    to_time = request.args.get('to_time', '24:00').strip()
+    hours_param = request.args.get('hours', 'all').strip().lower()
+    try:
+        if hours_param == 'all':
+            hours_val = 'all'
+        else:
+            h_int = int(hours_param)
+            hours_val = h_int if 1 <= h_int <= 24 else 'all'
+    except ValueError:
+        hours_val = 'all'
+
+    min_freq = request.args.get('min_freq', 1, type=int)
+    if min_freq < 1:
+        min_freq = 1
+
     results = detect_str(data_store['transactions'], config)
-    hourly_data = analyze_hourly_counterparty_frequency(data_store['transactions'], min_count=min_freq)
+    frequency_data = analyze_debitor_frequency(
+        data_store['transactions'],
+        from_time=from_time,
+        to_time=to_time,
+        hours_val=hours_val,
+        min_count=min_freq
+    )
     summary = {}
     if results:
         sevs = [r['severity'] for r in results]
@@ -1181,28 +1363,39 @@ def str_report():
         summary=summary,
         visible_cols=visible_cols,
         available_cols=available,
-        hourly_data=hourly_data,
+        frequency_data=frequency_data,
+        hourly_data=frequency_data,
+        from_time=from_time,
+        to_time=to_time,
+        hours_selected=hours_val,
         min_freq=min_freq
     )
 
 
+@app.route('/api/debitor_group/<group_id>/csv')
 @app.route('/api/hourly_group/<group_id>/csv')
-def export_hourly_group_csv(group_id):
-    hourly_data = analyze_hourly_counterparty_frequency(data_store['transactions'], min_count=1)
+def export_debitor_group_csv(group_id):
+    from_time = request.args.get('from_time', '00:00')
+    to_time = request.args.get('to_time', '24:00')
+    hours_param = request.args.get('hours', 'all')
+    frequency_data = analyze_debitor_frequency(
+        data_store['transactions'],
+        from_time=from_time,
+        to_time=to_time,
+        hours_val=hours_param,
+        min_count=1
+    )
     target_group = None
-    for m in hourly_data['merchants']:
-        for s in m['slots']:
-            for cp in s['counterparty_groups']:
-                if cp['group_id'] == group_id:
-                    target_group = cp
-                    break
-            if target_group:
+    for m in frequency_data['merchants']:
+        for deb in m['debitors']:
+            if deb['group_id'] == group_id:
+                target_group = deb
                 break
         if target_group:
             break
 
     if not target_group:
-        flash('Group not found', 'error')
+        flash('Debitor group not found', 'error')
         return redirect(url_for('str_report'))
 
     config = load_config()
@@ -1219,9 +1412,9 @@ def export_hourly_group_csv(group_id):
         output.append(','.join(vals))
 
     csv_data = '\r\n'.join(output)
-    clean_cp = "".join(c for c in target_group['counterparty_name'] if c.isalnum() or c in (' ', '_', '-')).strip().replace(' ', '_')
-    clean_slot = "".join(c for c in target_group['hour_label'] if c.isalnum() or c in ('-', '_')).strip()
-    filename = f"HourlyGroup_{clean_cp}_{clean_slot}.csv"
+    clean_deb = "".join(c for c in target_group['debitor_name'] if c.isalnum() or c in (' ', '_', '-')).strip().replace(' ', '_')
+    clean_merch = "".join(c for c in target_group['merchant_name'] if c.isalnum() or c in (' ', '_', '-')).strip().replace(' ', '_')
+    filename = f"DebitorPayments_{clean_merch}_{clean_deb}_{from_time.replace(':','')}_to_{to_time.replace(':','')}.csv"
     return Response(
         csv_data,
         mimetype='text/csv',
@@ -1368,13 +1561,47 @@ def download_template(template_type):
     )
 
 
+# Module-level eager init for serverless environments (Vercel, AWS Lambda, WSGI)
+try:
+    sync_bundled_data()
+    init_sample_data()
+    _data_initialized = True
+except Exception as e:
+    print(f"Serverless init notice: {e}")
+
+
 if __name__ == '__main__':
     import argparse
+    import threading
+    from werkzeug.serving import make_server
+
     parser = argparse.ArgumentParser(description='Risk Management App')
     parser.add_argument('--port', type=int, default=3000, help='Port to run on')
     parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to run on')
     args, _ = parser.parse_known_args()
 
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    try:
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    except Exception:
+        pass
     init_sample_data()
-    app.run(debug=False, host=args.host, port=args.port)
+
+    # Support Local Dev Server (Port 5151) and Dev Server (Port 3000) simultaneously
+    primary_port = args.port
+    secondary_port = 5151 if primary_port != 5151 else 3000
+
+    def run_secondary_port():
+        try:
+            srv = make_server(args.host, secondary_port, app)
+            srv.serve_forever()
+        except Exception as e:
+            print(f"Notice: Secondary port {secondary_port} service notice: {e}")
+
+    try:
+        t = threading.Thread(target=run_secondary_port, daemon=True)
+        t.start()
+        print(f" * Dual-port listening: Port {primary_port} (Primary) and Port {secondary_port} (Local Dev 5151 / Preview 3000)")
+    except Exception as e:
+        print(f"Secondary listener error: {e}")
+
+    app.run(debug=False, host=args.host, port=primary_port)

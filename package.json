@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "python3 app.py",
+    "local": "python3 app.py --port 5151",
     "build": "echo 'No build needed'",
     "preview": "python3 app.py",
     "start": "python3 app.py",

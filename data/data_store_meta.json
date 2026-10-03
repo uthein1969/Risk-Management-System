@@ -2,10 +2,10 @@
   "file_names": {
     "transactions": "MMQR_Merchant_Transactions_01102026.xlsx",
     "merchants": "sample_merchants.csv",
-    "blacklist": "file_1790843907255.xlsx"
+    "blacklist": "sample_blacklist.csv"
   },
-  "last_upload": "2026-10-02 05:32:37",
+  "last_upload": "2026-10-03 11:21:54",
   "transaction_count": 1152,
   "merchant_count": 30,
-  "blacklist_count": 126
+  "blacklist_count": 4
 }

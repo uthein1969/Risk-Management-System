@@ -13,8 +13,12 @@
   },
   "kyc": {
     "high_risk_types": [
+      "money exchange",
       "casino",
-      "crypto"
+      "crypto",
+      "pawnshop",
+      "night club",
+      "arms dealer"
     ],
     "new_merchant_days": 30
   },
